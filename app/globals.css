@@ -1,0 +1,184 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── CSS Custom Properties / Design Tokens ─────────────────────────────────── */
+
+:root {
+  /* Brand palette */
+  --color-brand-500: #28a46e;
+  --color-brand-600: #1a8458;
+  --color-brand-700: #166a48;
+
+  /* Surface */
+  --color-surface:        #ffffff;
+  --color-surface-muted:  #f6f8f7;
+  --color-surface-border: #e4ebe7;
+
+  /* Text */
+  --color-ink:           #0f1f18;
+  --color-ink-secondary: #4a6358;
+  --color-ink-muted:     #8aa898;
+
+  /* Semantic */
+  --color-danger:  #e53e3e;
+  --color-warning: #d97706;
+  --color-success: #16a34a;
+
+  /* Layout */
+  --nav-height: 64px;
+  --header-height: 56px;
+}
+
+/* ─── Base Reset ─────────────────────────────────────────────────────────────── */
+
+@layer base {
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+    /* Prevent overscroll bounce on iOS */
+    overscroll-behavior: none;
+  }
+
+  body {
+    @apply bg-surface text-ink antialiased;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    /* Prevent text selection on touch devices for button-heavy UIs */
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior: none;
+  }
+
+  /* Remove default button/input focus ring; we add our own */
+  button:focus-visible,
+  a:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    @apply outline-none ring-2 ring-brand-500 ring-offset-2;
+  }
+
+  /* Scrollbars */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply bg-surface-border rounded-full;
+  }
+}
+
+/* ─── Utility Classes ────────────────────────────────────────────────────────── */
+
+@layer utilities {
+  /* Safe-area-aware padding for iOS bottom bar */
+  .pb-safe {
+    padding-bottom: max(env(safe-area-inset-bottom), 8px);
+  }
+
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  /* Touch-friendly minimum tap target */
+  .touch-target {
+    min-height: 48px;
+    min-width: 48px;
+  }
+
+  /* Hide scrollbar but keep scrollable */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Truncate text with ellipsis */
+  .truncate-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+}
+
+/* ─── Component Base Classes ─────────────────────────────────────────────────── */
+
+@layer components {
+  /* Page-level container — accounts for header + bottom nav */
+  .page-content {
+    @apply flex flex-col min-h-screen;
+    padding-top: var(--header-height);
+    padding-bottom: calc(var(--nav-height) + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* Consistent card appearance */
+  .card {
+    @apply bg-surface rounded-2xl shadow-card border border-surface-border;
+  }
+
+  /* Section label (small all-caps group header) */
+  .section-label {
+    @apply text-xs font-semibold uppercase tracking-wider text-ink-muted;
+  }
+
+  /* Divider */
+  .divider {
+    @apply h-px bg-surface-border w-full;
+  }
+}
+
+/* ─── Animations ─────────────────────────────────────────────────────────────── */
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulse-ring {
+  0%   { box-shadow: 0 0 0 0 rgba(40, 164, 110, 0.4); }
+  70%  { box-shadow: 0 0 0 10px rgba(40, 164, 110, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(40, 164, 110, 0); }
+}
+
+.animate-fade-in {
+  animation: fade-in 0.2s ease-out both;
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s ease-out both;
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 1.8s ease-out infinite;
+}
+
+/* ─── Toast notification ─────────────────────────────────────────────────────── */
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-toast-in {
+  animation: toast-in 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
