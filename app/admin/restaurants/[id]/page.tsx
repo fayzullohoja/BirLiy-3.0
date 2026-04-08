@@ -96,6 +96,7 @@ export default function AdminShopDetailPage() {
 
   // ── Assign member form ─────────────────────────────────────────────────────
   const [assignOpen, setAssignOpen]   = useState(false)
+  const [assignSearch, setAssignSearch] = useState('')
   const [assignUserId, setAssignUserId] = useState('')
   const [assignRole, setAssignRole]   = useState<ShopUserRole>('waiter')
   const [assignSaving, setAssignSaving] = useState(false)
@@ -214,6 +215,7 @@ export default function AdminShopDetailPage() {
       }).then(r => r.json())
       if (res.error) { setAssignError(res.error.message); return }
       setAssignOpen(false)
+      setAssignSearch('')
       setAssignUserId('')
       setAssignRole('waiter')
       toast.success('Сотрудник добавлен')
@@ -255,6 +257,13 @@ export default function AdminShopDetailPage() {
   const availableUsers = allUsers
     .filter((user) => !memberIds.has(user.id))
     .sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+  const filteredUsers = availableUsers.filter((user) => {
+    const needle = assignSearch.trim().toLowerCase()
+    if (!needle) return true
+
+    return user.name.toLowerCase().includes(needle)
+      || user.username?.toLowerCase().includes(needle)
+  })
   const selectedUser = allUsers.find((user) => user.id === assignUserId) ?? null
 
   return (
@@ -396,6 +405,14 @@ export default function AdminShopDetailPage() {
       <BottomSheet open={assignOpen} onClose={() => setAssignOpen(false)} title="Добавить сотрудника">
         <div className="px-4 py-4 flex flex-col gap-3">
           <FormField
+            label="Поиск"
+            value={assignSearch}
+            onChange={setAssignSearch}
+            placeholder="Имя или @username"
+            disabled={usersLoading || availableUsers.length === 0}
+            hint="Начните вводить имя или username пользователя"
+          />
+          <FormField
             label="Пользователь"
             as="select"
             required
@@ -406,13 +423,15 @@ export default function AdminShopDetailPage() {
               ? 'Загружаем пользователей...'
               : availableUsers.length === 0
                 ? 'Все доступные пользователи уже прикреплены к заведению'
+                : filteredUsers.length === 0
+                  ? 'По этому запросу пользователи не найдены'
                 : 'Выберите пользователя из тех, кто уже есть в системе'}
             error={assignError ?? undefined}
           >
             <option value="">
               {usersLoading ? 'Загружаем пользователей...' : 'Выберите пользователя'}
             </option>
-            {availableUsers.map(user => (
+            {filteredUsers.map(user => (
               <option key={user.id} value={user.id}>
                 {user.name}{user.username ? ` (@${user.username})` : ''}{user.shops?.length ? ` · ${user.shops.length} завед.` : ''}
               </option>
