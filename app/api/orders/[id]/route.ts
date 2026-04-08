@@ -71,6 +71,7 @@ const TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
  * - Validates allowed status transitions.
  * - DB trigger handles table status sync automatically.
  * - Waiters can only update their own orders; owners can update any.
+ * - Kitchen can only move orders from in_kitchen to ready.
  *
  * Body: { status: OrderStatus, payment_type?: PaymentType }
  */
@@ -126,6 +127,22 @@ export async function PATCH(
     const shopRole = await verifyShopAccess(userId, role, order.shop_id)
     if (!shopRole) {
       return NextResponse.json(err('FORBIDDEN', 'No access to this shop'), { status: 403 })
+    }
+
+    if (shopRole === 'kitchen') {
+      if (payment_type) {
+        return NextResponse.json(
+          err('FORBIDDEN', 'Kitchen staff cannot set payment type'),
+          { status: 403 },
+        )
+      }
+
+      if (order.status !== 'in_kitchen' || status !== 'ready') {
+        return NextResponse.json(
+          err('FORBIDDEN', 'Kitchen staff can only mark in_kitchen orders as ready'),
+          { status: 403 },
+        )
+      }
     }
 
     // Waiters can only transition their own orders

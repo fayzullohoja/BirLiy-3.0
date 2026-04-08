@@ -7,7 +7,7 @@ import { err, ok } from '@/lib/utils'
  * GET /api/admin/users?role=waiter&search=text
  * List all platform users with their shop memberships.
  * Optional query params:
- *   role   — filter by user_role (super_admin | owner | waiter)
+ *   role   — filter by user_role (super_admin | owner | waiter | kitchen)
  *   search — partial match on name or username (case-insensitive)
  * Requires: super_admin.
  */

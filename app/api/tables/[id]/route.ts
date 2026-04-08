@@ -81,6 +81,13 @@ export async function PATCH(
       return NextResponse.json(err('FORBIDDEN', 'No access to this shop'), { status: 403 })
     }
 
+    if (shopRole === 'kitchen') {
+      return NextResponse.json(
+        err('FORBIDDEN', 'Kitchen staff cannot update tables'),
+        { status: 403 },
+      )
+    }
+
     // Structural changes (name, capacity) require owner
     const isStructuralChange = 'name' in body || 'capacity' in body
     if (isStructuralChange && shopRole !== 'owner') {

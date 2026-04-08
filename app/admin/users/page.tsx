@@ -28,12 +28,14 @@ interface ShopOption {
 const ROLE_LABELS: Record<UserRole, string> = {
   super_admin: 'Супер-Админ',
   owner:       'Владелец',
+  kitchen:     'Кухня',
   waiter:      'Официант',
 }
 
-const ROLE_BADGE: Record<UserRole, 'danger' | 'info' | 'neutral'> = {
+const ROLE_BADGE: Record<UserRole, 'danger' | 'info' | 'warning' | 'neutral'> = {
   super_admin: 'danger',
   owner:       'info',
+  kitchen:     'warning',
   waiter:      'neutral',
 }
 
@@ -41,6 +43,7 @@ const FILTER_OPTIONS: { value: '' | UserRole; label: string }[] = [
   { value: '',            label: 'Все' },
   { value: 'super_admin', label: 'Супер-Админ' },
   { value: 'owner',       label: 'Владельцы' },
+  { value: 'kitchen',     label: 'Кухня' },
   { value: 'waiter',      label: 'Официанты' },
 ]
 
@@ -139,7 +142,14 @@ export default function AdminUsersPage() {
         body: JSON.stringify({
           role: newRole,
           shop_id: newRole === 'super_admin' ? null : selectedShopId,
-          shop_role: newRole === 'owner' ? 'owner' : newRole === 'waiter' ? 'waiter' : null,
+                  shop_role:
+                    newRole === 'owner'
+                      ? 'owner'
+                      : newRole === 'kitchen'
+                        ? 'kitchen'
+                        : newRole === 'waiter'
+                          ? 'waiter'
+                          : null,
         }),
       }).then(r => r.json())
       if (res.error) { setSaveError(res.error.message); return }
@@ -238,7 +248,7 @@ export default function AdminUsersPage() {
             </p>
           )}
           <div className="flex flex-col gap-2">
-            {(['waiter', 'owner', 'super_admin'] as UserRole[]).map(r => (
+            {(['waiter', 'kitchen', 'owner', 'super_admin'] as UserRole[]).map(r => (
               <button
                 key={r}
                 onClick={() => {
@@ -267,7 +277,9 @@ export default function AdminUsersPage() {
                 disabled={shopsLoading}
                 hint={newRole === 'owner'
                   ? 'Для владельца по умолчанию выбрано демо-заведение'
-                  : 'Выберите заведение, где пользователь будет работать'}
+                  : newRole === 'kitchen'
+                    ? 'Выберите заведение, где пользователь будет работать на кухне'
+                    : 'Выберите заведение, где пользователь будет работать'}
               >
                 <option value="">
                   {shopsLoading ? 'Загружаем заведения...' : 'Выберите заведение'}
@@ -282,7 +294,7 @@ export default function AdminUsersPage() {
                 <p className="text-xs text-ink-muted">
                   Роль в заведении будет назначена как{' '}
                   <strong className="text-ink">
-                    {newRole === 'owner' ? 'владелец' : 'официант'}
+                    {newRole === 'owner' ? 'владелец' : newRole === 'kitchen' ? 'кухня' : 'официант'}
                   </strong>.
                 </p>
               </div>

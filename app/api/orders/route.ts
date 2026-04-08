@@ -70,7 +70,7 @@ export async function GET(req: NextRequest) {
  * - The DB trigger handles table status → 'occupied'.
  * - The DB unique index enforces one active order per table.
  *
- * Requires: any shop member (waiter_id is set to the caller).
+ * Requires: owner or waiter (waiter_id is set to the caller).
  *
  * Body: { shop_id, table_id, items: [{ menu_item_id, quantity, notes? }], notes? }
  */
@@ -81,7 +81,14 @@ export async function POST(req: NextRequest) {
     const guard  = await requireShopAccess(shopId)
     if (!guard.ok) return guard.response
 
-    const { userId } = guard.value
+    const { userId, shopRole } = guard.value
+    if (shopRole === 'kitchen') {
+      return NextResponse.json(
+        err('FORBIDDEN', 'Kitchen staff cannot create orders'),
+        { status: 403 },
+      )
+    }
+
     const { table_id, items, notes } = body
 
     if (!table_id || !Array.isArray(items) || items.length === 0) {

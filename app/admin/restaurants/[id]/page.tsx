@@ -49,6 +49,7 @@ const PLAN_LABELS: Record<SubPlan, string> = {
 
 const ROLE_LABELS: Record<ShopUserRole, string> = {
   owner:  'Владелец',
+  kitchen: 'Кухня',
   waiter: 'Официант',
 }
 
@@ -252,6 +253,7 @@ export default function AdminShopDetailPage() {
   const sub     = shop.subscription
   const members = shop.members ?? []
   const owners  = members.filter(m => m.role === 'owner')
+  const kitchens = members.filter(m => m.role === 'kitchen')
   const waiters = members.filter(m => m.role === 'waiter')
   const memberIds = new Set(members.map((member) => member.user_id))
   const availableUsers = allUsers
@@ -327,7 +329,7 @@ export default function AdminShopDetailPage() {
             <p className="px-4 py-6 text-center text-sm text-ink-muted">Нет персонала</p>
           ) : (
             <div className="divide-y divide-surface-border">
-              {[...owners, ...waiters].map(m => (
+              {[...owners, ...kitchens, ...waiters].map(m => (
                 <div key={m.id} className="flex items-center gap-3 px-4 py-3">
                   <div className="w-9 h-9 rounded-full bg-brand-100 flex items-center justify-center shrink-0">
                     <span className="text-xs font-bold text-brand-700">{initials(m.user?.name ?? '?')}</span>
@@ -448,8 +450,9 @@ export default function AdminShopDetailPage() {
           )}
           <div>
             <p className="text-xs font-semibold text-ink-secondary mb-2 uppercase tracking-wide">Роль</p>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-3 gap-2">
               <OptionButton label="Официант" active={assignRole === 'waiter'} onClick={() => setAssignRole('waiter')} />
+              <OptionButton label="Кухня" active={assignRole === 'kitchen'} onClick={() => setAssignRole('kitchen')} />
               <OptionButton label="Владелец" active={assignRole === 'owner'}  onClick={() => setAssignRole('owner')} />
             </div>
           </div>

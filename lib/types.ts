@@ -1,7 +1,7 @@
 // ─── Enums / Literal Types ────────────────────────────────────────────────────
 
-export type UserRole      = 'super_admin' | 'owner' | 'waiter'
-export type ShopUserRole  = 'owner' | 'waiter'
+export type UserRole      = 'super_admin' | 'owner' | 'waiter' | 'kitchen'
+export type ShopUserRole  = 'owner' | 'waiter' | 'kitchen'
 export type TableStatus   = 'free' | 'occupied' | 'reserved' | 'bill_requested'
 export type OrderStatus   = 'open' | 'in_kitchen' | 'ready' | 'paid' | 'cancelled'
 export type PaymentType   = 'cash' | 'card' | 'payme' | 'click'

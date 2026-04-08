@@ -79,6 +79,13 @@ export async function POST(
       return NextResponse.json(err('FORBIDDEN', 'No access to this shop'), { status: 403 })
     }
 
+    if (shopRole === 'kitchen') {
+      return NextResponse.json(
+        err('FORBIDDEN', 'Kitchen staff cannot modify order items'),
+        { status: 403 },
+      )
+    }
+
     // Waiters can only modify their own orders
     if (shopRole === 'waiter' && order.waiter_id !== userId) {
       return NextResponse.json(

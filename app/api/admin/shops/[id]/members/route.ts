@@ -5,7 +5,7 @@ import { err, ok } from '@/lib/utils'
 
 /**
  * POST /api/admin/shops/[id]/members
- * Assign a user to a shop with a given role (owner or waiter).
+ * Assign a user to a shop with a given role (owner, waiter or kitchen).
  * If the user already belongs to this shop, updates their role.
  * Body: { user_id, role }
  * Requires: super_admin.
@@ -25,8 +25,8 @@ export async function POST(
   if (!user_id) {
     return NextResponse.json(err('VALIDATION', 'user_id is required'), { status: 400 })
   }
-  if (role !== 'owner' && role !== 'waiter') {
-    return NextResponse.json(err('VALIDATION', 'role must be owner or waiter'), { status: 400 })
+  if (role !== 'owner' && role !== 'waiter' && role !== 'kitchen') {
+    return NextResponse.json(err('VALIDATION', 'role must be owner, waiter or kitchen'), { status: 400 })
   }
 
   const supabase = createServiceClient()
@@ -40,6 +40,18 @@ export async function POST(
 
   if (userErr || !user) {
     return NextResponse.json(err('NOT_FOUND', 'User not found'), { status: 404 })
+  }
+
+  if (user.role !== 'super_admin' && user.role !== role) {
+    const { error: roleError } = await supabase
+      .from('users')
+      .update({ role })
+      .eq('id', user_id)
+
+    if (roleError) {
+      console.error('[admin/shops/[id]/members POST role sync]', roleError)
+      return NextResponse.json(err('DB_ERROR', 'Failed to sync user role'), { status: 500 })
+    }
   }
 
   // Upsert membership

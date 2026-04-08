@@ -38,7 +38,7 @@ export async function requireAuth(): Promise<GuardResult<RequestUser>> {
 
 export interface ShopGuardResult {
   userId:    string
-  shopRole:  'owner' | 'waiter'
+  shopRole:  'owner' | 'waiter' | 'kitchen'
 }
 
 /**

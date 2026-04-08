@@ -168,7 +168,7 @@ async function upsertUserAndRespond(opts: {
 // ─── Dev auth helper ──────────────────────────────────────────────────────────
 
 async function handleDevAuth(devRole: string, telegramId: number) {
-  if (!['waiter', 'owner', 'super_admin'].includes(devRole)) {
+  if (!['waiter', 'kitchen', 'owner', 'super_admin'].includes(devRole)) {
     return NextResponse.json(err('BAD_DEV_ROLE', 'Invalid dev_role'), { status: 400 })
   }
 

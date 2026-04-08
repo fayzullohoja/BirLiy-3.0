@@ -64,6 +64,13 @@ export async function PATCH(
       return NextResponse.json(err('FORBIDDEN', 'No access to this shop'), { status: 403 })
     }
 
+    if (shopRole === 'kitchen') {
+      return NextResponse.json(
+        err('FORBIDDEN', 'Kitchen staff cannot modify order items'),
+        { status: 403 },
+      )
+    }
+
     if (shopRole === 'waiter' && order.waiter_id !== userId) {
       return NextResponse.json(
         err('FORBIDDEN', 'Waiters can only modify their own orders'),
@@ -161,6 +168,13 @@ export async function DELETE(
     const shopRole = await verifyShopAccess(userId, role, order.shop_id)
     if (!shopRole) {
       return NextResponse.json(err('FORBIDDEN', 'No access to this shop'), { status: 403 })
+    }
+
+    if (shopRole === 'kitchen') {
+      return NextResponse.json(
+        err('FORBIDDEN', 'Kitchen staff cannot modify order items'),
+        { status: 403 },
+      )
     }
 
     if (shopRole === 'waiter' && order.waiter_id !== userId) {

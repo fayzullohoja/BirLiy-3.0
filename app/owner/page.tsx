@@ -85,6 +85,7 @@ export default function OwnerDashboardPage() {
             <QuickTile label="Управление столами" icon={<TableIcon />}  onClick={() => router.push('/owner/tables')}   color="green"  />
             <QuickTile label="Бронирования"        icon={<BookingIcon />} onClick={() => router.push('/owner/bookings')} color="blue"   />
             <QuickTile label="История заказов"     icon={<HistoryIcon />} onClick={() => router.push('/owner/orders')}  color="amber"  />
+            <QuickTile label="Кухня"               icon={<KitchenIcon />} onClick={() => router.push('/kitchen')}       color="orange" />
             <QuickTile label="Персонал"             icon={<StaffIcon />}   onClick={() => router.push('/owner/staff')}   color="purple" />
           </div>
         </Section>
@@ -157,6 +158,7 @@ function QuickTile({ label, icon, onClick, color }: {
     green:  'bg-green-50  border-green-200  text-green-700',
     blue:   'bg-blue-50   border-blue-200   text-blue-700',
     amber:  'bg-amber-50  border-amber-200  text-amber-700',
+    orange: 'bg-orange-50 border-orange-200 text-orange-700',
     purple: 'bg-purple-50 border-purple-200 text-purple-700',
   }
   return (
@@ -203,6 +205,9 @@ function BookingIcon() {
 }
 function HistoryIcon() {
   return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="12 8 12 12 14 14" /><path d="M3.05 11a9 9 0 1 1 .5 4m-.5 5v-5h5" /></svg>
+}
+function KitchenIcon() {
+  return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M7 11a5 5 0 0 1 10 0" /><path d="M4 11h16v2a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3z" /><path d="M9 16v4M15 16v4" /><path d="M12 3v2" /></svg>
 }
 function StaffIcon() {
   return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>

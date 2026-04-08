@@ -11,6 +11,7 @@ import type { ShopUser } from '@/lib/types'
 
 const ROLE_LABELS: Record<string, string> = {
   waiter: 'Официант',
+  kitchen: 'Кухня',
   owner:  'Владелец',
 }
 
@@ -54,6 +55,7 @@ export default function OwnerStaffPage() {
   }
 
   const waiters = staff.filter(s => s.role === 'waiter')
+  const kitchens = staff.filter(s => s.role === 'kitchen')
   const owners  = staff.filter(s => s.role === 'owner')
 
   return (
@@ -76,7 +78,7 @@ export default function OwnerStaffPage() {
           <Section className="pt-4">
             <EmptyState
               title="Персонал не добавлен"
-              description="Поделитесь ботом с официантами — при первом входе они автоматически появятся здесь после привязки"
+              description="Поделитесь ботом с сотрудниками — при первом входе они автоматически появятся здесь после привязки"
             />
           </Section>
         ) : (
@@ -91,6 +93,23 @@ export default function OwnerStaffPage() {
                         member={s}
                         canRemove={false}
                         onRemove={() => {}}
+                      />
+                    ))}
+                  </div>
+                </CardSection>
+              </Section>
+            )}
+
+            {kitchens.length > 0 && (
+              <Section title="Кухня" className="pt-5 pb-6">
+                <CardSection>
+                  <div className="divide-y divide-surface-border">
+                    {kitchens.map(s => (
+                      <StaffRow
+                        key={s.id}
+                        member={s}
+                        canRemove={s.user?.id !== session.userId}
+                        onRemove={() => setDelete(s)}
                       />
                     ))}
                   </div>
@@ -120,9 +139,9 @@ export default function OwnerStaffPage() {
         {/* Info box about inviting */}
         {!loading && !error && (
           <div className="mx-4 mt-2 mb-6 p-4 rounded-2xl bg-blue-50 border border-blue-200">
-            <p className="text-xs font-semibold text-blue-700 mb-1">Как добавить официанта?</p>
+            <p className="text-xs font-semibold text-blue-700 mb-1">Как добавить сотрудника?</p>
             <p className="text-xs text-blue-600">
-              Поделитесь ссылкой на бот с официантом. При первом входе они появятся в системе. Привяжите их к ресторану через панель администратора.
+              Поделитесь ссылкой на бот с сотрудником. При первом входе он появится в системе. После этого привяжите его к ресторану через панель администратора.
             </p>
           </div>
         )}

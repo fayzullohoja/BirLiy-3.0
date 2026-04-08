@@ -3,7 +3,7 @@
  *
  * Responsibilities:
  *  1. Verify the session JWT from the cookie.
- *  2. Protect role-specific routes (/waiter, /owner, /admin).
+ *  2. Protect role-specific routes (/waiter, /kitchen, /owner, /admin).
  *  3. Redirect unauthenticated users to / (entry page).
  *  4. Redirect users without shop access to /not-connected.
  *  5. Redirect users with expired subscriptions to /subscription-blocked.
@@ -23,7 +23,7 @@ import type { UserRole } from '@/lib/types'
 // ─── Route matchers ───────────────────────────────────────────────────────────
 
 /** Routes that require authentication */
-const PROTECTED_PREFIXES = ['/waiter', '/owner', '/admin']
+const PROTECTED_PREFIXES = ['/waiter', '/kitchen', '/owner', '/admin']
 
 /** Routes that are always public (no auth needed) */
 const PUBLIC_PATHS = ['/', '/not-connected', '/subscription-blocked']
@@ -34,6 +34,7 @@ const PUBLIC_API_PREFIXES = ['/api/auth', '/_next', '/favicon']
 /** Role → allowed path prefix */
 const ROLE_HOME: Record<UserRole, string> = {
   waiter:      '/waiter',
+  kitchen:     '/kitchen',
   owner:       '/owner',
   super_admin: '/admin',
 }
@@ -106,12 +107,19 @@ export async function middleware(req: NextRequest) {
     }
 
     // /owner is owner or super_admin
-    if (pathname.startsWith('/owner') && role === 'waiter') {
-      return NextResponse.redirect(new URL(ROLE_HOME.waiter, req.url))
+    if (pathname.startsWith('/owner') && !['owner', 'super_admin'].includes(role)) {
+      return NextResponse.redirect(new URL(ROLE_HOME[role], req.url))
     }
 
-    // /waiter is accessible by waiter or owner (owner can preview)
-    // No restriction needed beyond auth + shop access
+    // /kitchen is accessible by kitchen, owner or super_admin
+    if (pathname.startsWith('/kitchen') && !['kitchen', 'owner', 'super_admin'].includes(role)) {
+      return NextResponse.redirect(new URL(ROLE_HOME[role], req.url))
+    }
+
+    // /waiter is accessible by waiter, owner or super_admin
+    if (pathname.startsWith('/waiter') && role === 'kitchen') {
+      return NextResponse.redirect(new URL(ROLE_HOME.kitchen, req.url))
+    }
   }
 
   // ── Inject user context into request headers for API routes ─────────────────

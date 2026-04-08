@@ -3,8 +3,8 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { requireSuperAdmin } from '@/lib/auth/apiGuard'
 import { err, ok } from '@/lib/utils'
 
-const VALID_ROLES = ['super_admin', 'owner', 'waiter'] as const
-const VALID_SHOP_ROLES = ['owner', 'waiter'] as const
+const VALID_ROLES = ['super_admin', 'owner', 'waiter', 'kitchen'] as const
+const VALID_SHOP_ROLES = ['owner', 'waiter', 'kitchen'] as const
 const DEFAULT_DEMO_SHOP_ID = '00000000-0000-0000-0000-000000000001'
 
 /**
@@ -51,9 +51,9 @@ export async function GET(
  * PATCH /api/admin/users/[id]
  * Update a user's platform role and optionally attach them to a shop.
  * Body: {
- *   role: 'super_admin' | 'owner' | 'waiter',
+ *   role: 'super_admin' | 'owner' | 'waiter' | 'kitchen',
  *   shop_id?: string,
- *   shop_role?: 'owner' | 'waiter',
+ *   shop_role?: 'owner' | 'waiter' | 'kitchen',
  * }
  * Requires: super_admin.
  */
@@ -84,7 +84,9 @@ export async function PATCH(
       ? body.shop_role as (typeof VALID_SHOP_ROLES)[number]
       : role === 'owner'
         ? 'owner'
-        : 'waiter'
+        : role === 'kitchen'
+          ? 'kitchen'
+          : 'waiter'
 
   if (role !== 'super_admin' && !shopId) {
     const { data: demoShop } = await supabase
@@ -109,7 +111,7 @@ export async function PATCH(
 
   if (role !== 'super_admin' && !shopId) {
     return NextResponse.json(
-      err('VALIDATION', 'shop_id is required for owner/waiter'),
+      err('VALIDATION', 'shop_id is required for owner/waiter/kitchen'),
       { status: 400 },
     )
   }

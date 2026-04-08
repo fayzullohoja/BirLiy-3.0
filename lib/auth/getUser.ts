@@ -98,7 +98,7 @@ export async function getUserContext(userId: string): Promise<UserContext> {
 
   const rawAccess = (accessRes.data ?? []) as unknown as Array<{
     shop_id: string
-    role:    'owner' | 'waiter'
+    role:    'owner' | 'waiter' | 'kitchen'
     shop:    (typeof userRes.data) & {
       subscription: { id: string; shop_id: string; status: string; plan: string; expires_at: string; created_at: string; updated_at: string } | null
     }
@@ -157,7 +157,7 @@ export async function verifyShopAccess(
   userId: string,
   role:   UserRole,
   shopId: string,
-): Promise<'owner' | 'waiter' | null> {
+): Promise<'owner' | 'waiter' | 'kitchen' | null> {
   if (role === 'super_admin') return 'owner' // super_admin treated as owner everywhere
 
   const supabase = createServiceClient()
@@ -168,7 +168,7 @@ export async function verifyShopAccess(
     .eq('shop_id', shopId)
     .single()
 
-  return (data?.role as 'owner' | 'waiter' | undefined) ?? null
+  return (data?.role as 'owner' | 'waiter' | 'kitchen' | undefined) ?? null
 }
 
 // ─── AuthError ────────────────────────────────────────────────────────────────

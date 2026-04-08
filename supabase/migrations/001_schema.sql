@@ -5,8 +5,8 @@
 
 -- ─── Custom Types ─────────────────────────────────────────────────────────────
 
-CREATE TYPE public.user_role      AS ENUM ('super_admin', 'owner', 'waiter');
-CREATE TYPE public.shop_user_role AS ENUM ('owner', 'waiter');
+CREATE TYPE public.user_role      AS ENUM ('super_admin', 'owner', 'waiter', 'kitchen');
+CREATE TYPE public.shop_user_role AS ENUM ('owner', 'waiter', 'kitchen');
 CREATE TYPE public.table_status   AS ENUM ('free', 'occupied', 'reserved', 'bill_requested');
 CREATE TYPE public.order_status   AS ENUM ('open', 'in_kitchen', 'ready', 'paid', 'cancelled');
 CREATE TYPE public.payment_type   AS ENUM ('cash', 'card');
