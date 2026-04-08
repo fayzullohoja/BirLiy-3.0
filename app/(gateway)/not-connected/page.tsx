@@ -86,7 +86,13 @@ function RetryButton() {
 
   async function handleRetry() {
     setLoading(true)
-    // Re-trigger auth to pick up any new shop assignments
+    // Clear the stale session before re-running auth so role/shop changes
+    // made in the database are reflected immediately.
+    await fetch('/api/auth/logout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    }).catch(() => null)
+
     window.location.replace('/')
   }
 
