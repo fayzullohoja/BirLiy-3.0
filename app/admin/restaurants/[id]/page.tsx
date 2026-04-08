@@ -21,6 +21,10 @@ interface ShopDetail extends Shop {
   members:      (ShopUser & { user?: AppUser })[]
 }
 
+interface AssignableUser extends AppUser {
+  shops?: { id: string; role: string; shop: { id: string; name: string; is_active: boolean } | null }[]
+}
+
 // ─── Config ───────────────────────────────────────────────────────────────────
 
 const SUB_LABEL: Record<SubStatus, string> = {
@@ -69,7 +73,9 @@ export default function AdminShopDetailPage() {
   const router  = useRouter()
 
   const [shop, setShop]       = useState<ShopDetail | null>(null)
+  const [allUsers, setAllUsers] = useState<AssignableUser[]>([])
   const [loading, setLoading] = useState(true)
+  const [usersLoading, setUsersLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
 
   // ── Edit shop form ─────────────────────────────────────────────────────────
@@ -140,7 +146,19 @@ export default function AdminShopDetailPage() {
       .finally(() => setLoading(false))
   }, [id])
 
+  const fetchUsers = useCallback(() => {
+    setUsersLoading(true)
+    fetch('/api/admin/users')
+      .then(r => r.json())
+      .then(res => {
+        if (res.error) return
+        setAllUsers(res.data ?? [])
+      })
+      .finally(() => setUsersLoading(false))
+  }, [])
+
   useEffect(() => { fetchShop() }, [fetchShop])
+  useEffect(() => { fetchUsers() }, [fetchUsers])
 
   // ── Edit shop ──────────────────────────────────────────────────────────────
 
@@ -186,7 +204,7 @@ export default function AdminShopDetailPage() {
   // ── Assign member ─────────────────────────────────────────────────────────
 
   async function handleAssign() {
-    if (!assignUserId.trim()) { setAssignError('Введите UUID пользователя'); return }
+    if (!assignUserId.trim()) { setAssignError('Выберите пользователя'); return }
     setAssignSaving(true); setAssignError(null)
     try {
       const res = await fetch(`/api/admin/shops/${id}/members`, {
@@ -233,6 +251,11 @@ export default function AdminShopDetailPage() {
   const members = shop.members ?? []
   const owners  = members.filter(m => m.role === 'owner')
   const waiters = members.filter(m => m.role === 'waiter')
+  const memberIds = new Set(members.map((member) => member.user_id))
+  const availableUsers = allUsers
+    .filter((user) => !memberIds.has(user.id))
+    .sort((a, b) => a.name.localeCompare(b.name, 'ru'))
+  const selectedUser = allUsers.find((user) => user.id === assignUserId) ?? null
 
   return (
     <div className="min-h-screen bg-surface-muted pb-safe">
@@ -373,14 +396,37 @@ export default function AdminShopDetailPage() {
       <BottomSheet open={assignOpen} onClose={() => setAssignOpen(false)} title="Добавить сотрудника">
         <div className="px-4 py-4 flex flex-col gap-3">
           <FormField
-            label="UUID пользователя"
+            label="Пользователь"
+            as="select"
             required
             value={assignUserId}
             onChange={setAssignUserId}
-            placeholder="xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-            hint="Найдите пользователя на вкладке «Пользователи» и скопируйте его ID"
+            disabled={usersLoading}
+            hint={usersLoading
+              ? 'Загружаем пользователей...'
+              : availableUsers.length === 0
+                ? 'Все доступные пользователи уже прикреплены к заведению'
+                : 'Выберите пользователя из тех, кто уже есть в системе'}
             error={assignError ?? undefined}
-          />
+          >
+            <option value="">
+              {usersLoading ? 'Загружаем пользователей...' : 'Выберите пользователя'}
+            </option>
+            {availableUsers.map(user => (
+              <option key={user.id} value={user.id}>
+                {user.name}{user.username ? ` (@${user.username})` : ''}{user.shops?.length ? ` · ${user.shops.length} завед.` : ''}
+              </option>
+            ))}
+          </FormField>
+          {selectedUser && (
+            <div className="rounded-xl bg-surface-muted border border-surface-border px-3 py-2">
+              <p className="text-sm font-semibold text-ink">{selectedUser.name}</p>
+              <p className="text-xs text-ink-muted">
+                {selectedUser.username ? `@${selectedUser.username}` : `Telegram ID: ${selectedUser.telegram_id}`}
+                {selectedUser.shops?.length ? ` · Уже в ${selectedUser.shops.length} завед.` : ' · Пока не прикреплён к заведениям'}
+              </p>
+            </div>
+          )}
           <div>
             <p className="text-xs font-semibold text-ink-secondary mb-2 uppercase tracking-wide">Роль</p>
             <div className="grid grid-cols-2 gap-2">
@@ -388,7 +434,14 @@ export default function AdminShopDetailPage() {
               <OptionButton label="Владелец" active={assignRole === 'owner'}  onClick={() => setAssignRole('owner')} />
             </div>
           </div>
-          <Button fullWidth loading={assignSaving} onClick={handleAssign}>Добавить</Button>
+          <Button
+            fullWidth
+            loading={assignSaving}
+            disabled={!assignUserId || availableUsers.length === 0}
+            onClick={handleAssign}
+          >
+            Добавить
+          </Button>
         </div>
       </BottomSheet>
 
