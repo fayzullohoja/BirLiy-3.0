@@ -1,7 +1,7 @@
 'use client'
 
 import type { ApiResponse, AuthResponse } from '@/lib/types'
-import { getTelegramInitData, isInTelegram } from '@/lib/telegram/webapp'
+import { getTelegramInitData, getTelegramWebApp, isInTelegram } from '@/lib/telegram/webapp'
 
 export async function refreshTelegramSession(): Promise<AuthResponse> {
   if (!isInTelegram()) {
@@ -30,6 +30,25 @@ export async function refreshTelegramSession(): Promise<AuthResponse> {
   }
 
   return json.data
+}
+
+export async function signOutCurrentSession() {
+  await fetch('/api/auth/logout', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  }).catch(() => null)
+
+  if (typeof window === 'undefined') return
+
+  if (isInTelegram()) {
+    getTelegramWebApp()?.close()
+    window.setTimeout(() => {
+      window.location.replace('/')
+    }, 150)
+    return
+  }
+
+  window.location.replace('/')
 }
 
 export function resolveAuthDestination(data: AuthResponse): string {
