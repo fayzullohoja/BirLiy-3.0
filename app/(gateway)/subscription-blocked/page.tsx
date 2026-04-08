@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { refreshTelegramSession, resolveAuthDestination } from '@/lib/auth/clientAuth'
 
 interface SubInfo {
   shopName:   string
@@ -17,6 +18,7 @@ interface SubInfo {
 export default function SubscriptionBlockedPage() {
   const [info, setInfo]       = useState<SubInfo | null>(null)
   const [isOwner, setIsOwner] = useState(false)
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     // Read the session cookie claims via a lightweight status endpoint
@@ -109,11 +111,21 @@ export default function SubscriptionBlockedPage() {
 
       {/* Retry — checks if subscription was renewed */}
       <button
-        onClick={() => window.location.replace('/')}
+        onClick={async () => {
+          setLoading(true)
+          try {
+            const auth = await refreshTelegramSession()
+            window.location.replace(resolveAuthDestination(auth))
+          } catch {
+            window.location.replace('/')
+          }
+        }}
         className="w-full h-12 rounded-2xl border border-surface-border text-ink-secondary font-semibold text-sm
-          hover:bg-surface-muted active:bg-surface-border transition-colors"
+          hover:bg-surface-muted active:bg-surface-border transition-colors
+          disabled:opacity-60 disabled:cursor-not-allowed"
+        disabled={loading}
       >
-        Проверить снова
+        {loading ? 'Проверяем...' : 'Проверить снова'}
       </button>
     </div>
   )
