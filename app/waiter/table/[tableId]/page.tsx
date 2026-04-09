@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { BottomSheet } from '@/components/ui/BottomSheet'
+import { toast } from '@/components/ui/Toast'
 import { useWaiterSession } from '../../_context/WaiterSessionContext'
 import { formatUZS, formatTime, PAYMENT_TYPE_LABELS, ORDER_STATUS_LABELS } from '@/lib/utils'
 import type { Order, OrderItem, PaymentType, Table } from '@/lib/types'
@@ -12,6 +13,15 @@ import type { Order, OrderItem, PaymentType, Table } from '@/lib/types'
 interface PageData {
   table: Table
   order: Order | null
+}
+
+const LIVE_FETCH_OPTIONS: RequestInit = { cache: 'no-store' }
+
+const SUCCESS_MESSAGES: Partial<Record<'in_kitchen' | 'ready' | 'paid' | 'cancelled', string>> = {
+  in_kitchen: 'Заказ отправлен на кухню',
+  ready: 'Заказ отмечен как готовый',
+  paid: 'Оплата принята',
+  cancelled: 'Заказ отменён',
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -26,6 +36,8 @@ export default function TableDetailPage() {
   const [error, setError]             = useState<string | null>(null)
   const [actionLoading, setAction]    = useState(false)
   const [paymentSheet, setPaymentSheet] = useState(false)
+  const liveOrderId = data?.order?.id ?? null
+  const liveOrderStatus = data?.order?.status ?? null
 
   // Telegram back button
   const tgBack = useRef<(() => void) | null>(null)
@@ -41,28 +53,63 @@ export default function TableDetailPage() {
     }
   }, [router])
 
-  const fetchData = useCallback(() => {
-    if (session.loading) return
-    setLoading(true)
-    const shopId = session.primaryShopId
+  const fetchData = useCallback(async (mode: 'initial' | 'refresh' = 'initial') => {
+    if (session.loading || !session.primaryShopId) return
+    if (mode === 'initial') setLoading(true)
 
-    Promise.all([
-      fetch(`/api/tables/${tableId}`).then(r => r.json()),
-      fetch(`/api/orders?shop_id=${shopId}&table_id=${tableId}&status=open,in_kitchen,ready`).then(r => r.json()),
-    ])
-      .then(([tableRes, ordersRes]) => {
-        if (tableRes.error) {
-          setError(tableRes.error.message)
-          return
-        }
-        const activeOrder: Order | null = ordersRes.data?.[0] ?? null
-        setData({ table: tableRes.data, order: activeOrder })
-      })
-      .catch(() => setError('Не удалось загрузить данные'))
-      .finally(() => setLoading(false))
+    try {
+      const [tableRes, ordersRes] = await Promise.all([
+        fetch(`/api/tables/${tableId}`, LIVE_FETCH_OPTIONS).then(r => r.json()),
+        fetch(
+          `/api/orders?shop_id=${session.primaryShopId}&table_id=${tableId}&status=open,in_kitchen,ready`,
+          LIVE_FETCH_OPTIONS,
+        ).then(r => r.json()),
+      ])
+
+      if (tableRes.error) {
+        setError(tableRes.error.message)
+        return
+      }
+
+      if (ordersRes.error) {
+        setError(ordersRes.error.message)
+        return
+      }
+
+      const activeOrder: Order | null = ordersRes.data?.[0] ?? null
+      setError(null)
+      setData({ table: tableRes.data, order: activeOrder })
+    } catch {
+      setError('Не удалось загрузить данные')
+    } finally {
+      if (mode === 'initial') setLoading(false)
+    }
   }, [session.loading, session.primaryShopId, tableId])
 
-  useEffect(() => { fetchData() }, [fetchData])
+  useEffect(() => {
+    void fetchData('initial')
+  }, [fetchData])
+
+  useEffect(() => {
+    if (session.loading || !liveOrderId || !liveOrderStatus || !['in_kitchen', 'ready'].includes(liveOrderStatus)) {
+      return
+    }
+
+    const refresh = () => { void fetchData('refresh') }
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') refresh()
+    }
+
+    const intervalId = window.setInterval(refresh, 8_000)
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
+    return () => {
+      window.clearInterval(intervalId)
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [fetchData, liveOrderId, liveOrderStatus, session.loading])
 
   // ── Qty adjustment ──────────────────────────────────────────────────────────
   async function adjustQty(item: OrderItem, delta: number) {
@@ -78,15 +125,24 @@ export default function TableDetailPage() {
       body: JSON.stringify({ quantity: newQty }),
     }).then(r => r.json())
     setAction(false)
-    if (!res.error) setData(prev => prev ? { ...prev, order: res.data } : prev)
+    if (res.error) {
+      toast.error(res.error.message)
+      return
+    }
+    setData(prev => prev ? { ...prev, order: res.data } : prev)
   }
 
   // ── Delete item ─────────────────────────────────────────────────────────────
   async function deleteItem(item: OrderItem) {
     setAction(true)
-    await fetch(`/api/order-items/${item.id}`, { method: 'DELETE' })
+    const res = await fetch(`/api/order-items/${item.id}`, { method: 'DELETE' })
     setAction(false)
-    fetchData()
+    if (!res.ok) {
+      const json = await res.json().catch(() => null)
+      toast.error(json?.error?.message ?? 'Не удалось удалить позицию')
+      return
+    }
+    await fetchData('refresh')
   }
 
   // ── Status transition ───────────────────────────────────────────────────────
@@ -99,12 +155,20 @@ export default function TableDetailPage() {
       body: JSON.stringify({ status, ...(paymentType ? { payment_type: paymentType } : {}) }),
     }).then(r => r.json())
     setAction(false)
-    if (!res.error) {
-      if (status === 'paid' || status === 'cancelled') {
-        router.push('/waiter')
-      } else {
-        setData(prev => prev ? { ...prev, order: res.data } : prev)
-      }
+
+    if (res.error) {
+      toast.error(res.error.message)
+      return
+    }
+
+    if (SUCCESS_MESSAGES[status as keyof typeof SUCCESS_MESSAGES]) {
+      toast.success(SUCCESS_MESSAGES[status as keyof typeof SUCCESS_MESSAGES]!)
+    }
+
+    if (status === 'paid' || status === 'cancelled') {
+      router.push('/waiter')
+    } else {
+      await fetchData('refresh')
     }
   }
 
@@ -130,7 +194,7 @@ export default function TableDetailPage() {
 
   const { table, order } = data
   const items = order?.items ?? []
-  const canEdit = !order || order.status === 'open' || order.status === 'in_kitchen'
+  const canEdit = !order || order.status === 'open'
 
   return (
     <div className="min-h-screen flex flex-col bg-surface-muted pb-[env(safe-area-inset-bottom)]">
@@ -235,6 +299,7 @@ export default function TableDetailPage() {
           loading={actionLoading}
           onTransition={transitionOrder}
           onPaymentSheet={() => setPaymentSheet(true)}
+          onRefresh={() => void fetchData('refresh')}
         />
       )}
 
@@ -313,11 +378,13 @@ function ActionBar({
   loading,
   onTransition,
   onPaymentSheet,
+  onRefresh,
 }: {
   order: Order
   loading: boolean
   onTransition: (status: string, payment?: PaymentType) => void
   onPaymentSheet: () => void
+  onRefresh: () => void
 }) {
   const status = order.status
 
@@ -342,40 +409,48 @@ function ActionBar({
         </div>
       )}
       {status === 'in_kitchen' && (
-        <div className="flex gap-2">
+        <>
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
+            <p className="text-sm font-semibold text-amber-900">Заказ уже на кухне</p>
+            <p className="text-xs text-amber-800 mt-1">
+              Кухня этого заведения видит его в очереди. Когда повар отметит заказ готовым, статус обновится здесь автоматически.
+            </p>
+          </div>
           <button
-            onClick={() => onTransition('ready')}
+            onClick={onRefresh}
             disabled={loading}
-            className="flex-1 py-3.5 rounded-2xl bg-amber-500 text-white font-semibold text-sm disabled:opacity-50 active:scale-95 transition-transform"
+            className="w-full py-3.5 rounded-2xl bg-surface-muted text-ink-secondary font-semibold text-sm border border-surface-border disabled:opacity-50 active:scale-95 transition-transform"
           >
-            Готово
+            Обновить статус
           </button>
+        </>
+      )}
+      {status === 'ready' && (
+        <>
+          <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3">
+            <p className="text-sm font-semibold text-green-900">Заказ готов к выдаче</p>
+            <p className="text-xs text-green-800 mt-1">
+              Передайте заказ гостю и только потом принимайте оплату.
+            </p>
+          </div>
           <button
             onClick={onPaymentSheet}
             disabled={loading}
-            className="flex-1 py-3.5 rounded-2xl bg-surface-muted text-ink-secondary font-semibold text-sm border border-surface-border disabled:opacity-50 active:scale-95 transition-transform"
+            className="w-full py-3.5 rounded-2xl bg-brand-600 text-white font-semibold text-base disabled:opacity-50 active:scale-95 transition-transform"
           >
-            Оплатить
+            Принять оплату
           </button>
-        </div>
+        </>
       )}
-      {status === 'ready' && (
+      {status === 'open' && (
         <button
-          onClick={onPaymentSheet}
+          onClick={() => onTransition('cancelled')}
           disabled={loading}
-          className="w-full py-3.5 rounded-2xl bg-brand-600 text-white font-semibold text-base disabled:opacity-50 active:scale-95 transition-transform"
+          className="w-full py-2.5 rounded-2xl text-danger text-sm font-medium disabled:opacity-40 active:scale-95 transition-transform"
         >
-          Принять оплату
+          Отменить заказ
         </button>
       )}
-      {/* Cancel */}
-      <button
-        onClick={() => onTransition('cancelled')}
-        disabled={loading}
-        className="w-full py-2.5 rounded-2xl text-danger text-sm font-medium disabled:opacity-40 active:scale-95 transition-transform"
-      >
-        Отменить заказ
-      </button>
     </div>
   )
 }

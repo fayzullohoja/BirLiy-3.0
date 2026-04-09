@@ -9,7 +9,7 @@ import type { Order } from '@/lib/types'
  * POST /api/orders/[id]/items
  *
  * Adds one or more items to an existing order.
- * Order must be 'open' or 'in_kitchen'.
+ * Order must stay in 'open' status.
  * Prices are always taken from the DB (menu_items.price), not the client.
  *
  * Body: { items: Array<{ menu_item_id: string; quantity: number; notes?: string }> }
@@ -66,7 +66,7 @@ export async function POST(
       return NextResponse.json(err('NOT_FOUND', 'Order not found'), { status: 404 })
     }
 
-    if (!['open', 'in_kitchen'].includes(order.status)) {
+    if (order.status !== 'open') {
       return NextResponse.json(
         err('ORDER_NOT_EDITABLE', `Cannot add items to an order with status '${order.status}'`),
         { status: 422 },

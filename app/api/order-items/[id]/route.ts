@@ -9,7 +9,7 @@ import type { Order } from '@/lib/types'
  * PATCH /api/order-items/[id]
  *
  * Updates quantity (and optionally notes) of an existing order item.
- * Order must be 'open' or 'in_kitchen'.
+ * Order must stay in 'open' status.
  * DB trigger recalculates order total automatically.
  *
  * Body: { quantity: number; notes?: string }
@@ -52,7 +52,7 @@ export async function PATCH(
       id: string; shop_id: string; waiter_id: string; status: string
     }
 
-    if (!['open', 'in_kitchen'].includes(order.status)) {
+    if (order.status !== 'open') {
       return NextResponse.json(
         err('ORDER_NOT_EDITABLE', `Cannot modify items on an order with status '${order.status}'`),
         { status: 422 },
@@ -129,7 +129,7 @@ export async function PATCH(
  * DELETE /api/order-items/[id]
  *
  * Removes an item from an order.
- * Order must be 'open' or 'in_kitchen'.
+ * Order must stay in 'open' status.
  * DB trigger recalculates order total automatically.
  */
 export async function DELETE(
@@ -158,7 +158,7 @@ export async function DELETE(
       id: string; shop_id: string; waiter_id: string; status: string
     }
 
-    if (!['open', 'in_kitchen'].includes(order.status)) {
+    if (order.status !== 'open') {
       return NextResponse.json(
         err('ORDER_NOT_EDITABLE', `Cannot remove items from an order with status '${order.status}'`),
         { status: 422 },

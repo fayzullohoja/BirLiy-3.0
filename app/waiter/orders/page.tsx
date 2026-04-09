@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import AppHeader from '@/components/layout/AppHeader'
 import PageContainer, { Section, EmptyState } from '@/components/ui/PageContainer'
@@ -10,6 +10,8 @@ import { formatUZS, formatTime } from '@/lib/utils'
 import { useWaiterSession } from '../_context/WaiterSessionContext'
 import type { Order } from '@/lib/types'
 
+const LIVE_FETCH_OPTIONS: RequestInit = { cache: 'no-store' }
+
 export default function WaiterOrdersPage() {
   const session = useWaiterSession()
   const router  = useRouter()
@@ -18,28 +20,48 @@ export default function WaiterOrdersPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
 
-  useEffect(() => {
-    if (session.loading) return
-    let cancelled = false
+  const fetchOrders = useCallback(async (mode: 'initial' | 'refresh' = 'initial') => {
+    if (session.loading || !session.primaryShopId) return
+    if (mode === 'initial') setLoading(true)
+    try {
+      const res = await fetch(
+        `/api/orders?shop_id=${session.primaryShopId}&status=open,in_kitchen,ready`,
+        LIVE_FETCH_OPTIONS,
+      ).then(r => r.json())
 
-    setLoading(true)
-    fetch(
-      `/api/orders?shop_id=${session.primaryShopId}&status=open,in_kitchen,ready`,
-    )
-      .then(r => r.json())
-      .then(res => {
-        if (cancelled) return
-        if (res.error) {
-          setError(res.error.message)
-        } else {
-          setOrders(res.data ?? [])
-        }
-      })
-      .catch(() => { if (!cancelled) setError('Не удалось загрузить заказы') })
-      .finally(() => { if (!cancelled) setLoading(false) })
-
-    return () => { cancelled = true }
+      if (res.error) {
+        setError(res.error.message)
+      } else {
+        setError(null)
+        setOrders(res.data ?? [])
+      }
+    } catch {
+      setError('Не удалось загрузить заказы')
+    } finally {
+      if (mode === 'initial') setLoading(false)
+    }
   }, [session.loading, session.primaryShopId])
+
+  useEffect(() => {
+    if (session.loading || !session.primaryShopId) return
+
+    void fetchOrders('initial')
+
+    const refresh = () => { void fetchOrders('refresh') }
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') refresh()
+    }
+
+    const intervalId = window.setInterval(refresh, 10_000)
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
+    return () => {
+      window.clearInterval(intervalId)
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
+  }, [fetchOrders, session.loading, session.primaryShopId])
 
   return (
     <>

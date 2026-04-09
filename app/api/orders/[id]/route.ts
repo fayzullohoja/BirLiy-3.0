@@ -64,13 +64,22 @@ const TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
   cancelled:  [],
 }
 
+const WAITER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  open:       ['in_kitchen', 'paid', 'cancelled'],
+  in_kitchen: [],
+  ready:      ['paid'],
+  paid:       [],
+  cancelled:  [],
+}
+
 /**
  * PATCH /api/orders/[id]
  *
  * Transitions order status and optionally sets payment_type.
  * - Validates allowed status transitions.
  * - DB trigger handles table status sync automatically.
- * - Waiters can only update their own orders; owners can update any.
+ * - Waiters can only update their own orders and cannot interfere once the
+ *   order is already on the kitchen queue.
  * - Kitchen can only move orders from in_kitchen to ready.
  *
  * Body: { status: OrderStatus, payment_type?: PaymentType }
@@ -129,31 +138,6 @@ export async function PATCH(
       return NextResponse.json(err('FORBIDDEN', 'No access to this shop'), { status: 403 })
     }
 
-    if (shopRole === 'kitchen') {
-      if (payment_type) {
-        return NextResponse.json(
-          err('FORBIDDEN', 'Kitchen staff cannot set payment type'),
-          { status: 403 },
-        )
-      }
-
-      if (order.status !== 'in_kitchen' || status !== 'ready') {
-        return NextResponse.json(
-          err('FORBIDDEN', 'Kitchen staff can only mark in_kitchen orders as ready'),
-          { status: 403 },
-        )
-      }
-    }
-
-    // Waiters can only transition their own orders
-    if (shopRole === 'waiter' && order.waiter_id !== userId) {
-      return NextResponse.json(
-        err('FORBIDDEN', 'Waiters can only update their own orders'),
-        { status: 403 },
-      )
-    }
-
-    // Validate status transition
     const currentStatus = order.status as OrderStatus
     const allowed       = TRANSITIONS[currentStatus]
     if (!allowed.includes(status)) {
@@ -164,6 +148,46 @@ export async function PATCH(
         ),
         { status: 422 },
       )
+    }
+
+    if (shopRole === 'kitchen') {
+      if (payment_type) {
+        return NextResponse.json(
+          err('FORBIDDEN', 'Kitchen staff cannot set payment type'),
+          { status: 403 },
+        )
+      }
+
+      if (currentStatus !== 'in_kitchen' || status !== 'ready') {
+        return NextResponse.json(
+          err('FORBIDDEN', 'Kitchen staff can only mark in_kitchen orders as ready'),
+          { status: 403 },
+        )
+      }
+    }
+
+    // Waiters can only transition their own orders and cannot interfere while the
+    // order is already being cooked.
+    if (shopRole === 'waiter') {
+      if (order.waiter_id !== userId) {
+        return NextResponse.json(
+          err('FORBIDDEN', 'Waiters can only update their own orders'),
+          { status: 403 },
+        )
+      }
+
+      const waiterAllowed = WAITER_TRANSITIONS[currentStatus]
+      if (!waiterAllowed.includes(status)) {
+        return NextResponse.json(
+          err(
+            'FORBIDDEN',
+            currentStatus === 'in_kitchen'
+              ? 'Waiters cannot change an order while it is on the kitchen queue'
+              : `Waiters cannot transition '${currentStatus}' orders to '${status}'`,
+          ),
+          { status: 403 },
+        )
+      }
     }
 
     // Perform update; DB trigger handles table status sync
