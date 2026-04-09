@@ -82,6 +82,7 @@ export async function getUserContext(userId: string): Promise<UserContext> {
       .select(`
         shop_id,
         role,
+        created_at,
         shop:shops (
           id, name, address, phone, is_active, created_at, updated_at,
           subscription:subscriptions (
@@ -99,12 +100,24 @@ export async function getUserContext(userId: string): Promise<UserContext> {
   const rawAccess = (accessRes.data ?? []) as unknown as Array<{
     shop_id: string
     role:    'owner' | 'waiter' | 'kitchen'
+    created_at: string
     shop:    (typeof userRes.data) & {
       subscription: { id: string; shop_id: string; status: string; plan: string; expires_at: string; created_at: string; updated_at: string } | null
     }
   }>
 
-  const shopAccess: ShopAccessEntry[] = rawAccess.map((row) => ({
+  const sortedAccess = [...rawAccess].sort((a, b) => {
+    const aActive = hasActiveSubscription(a.shop.subscription)
+    const bActive = hasActiveSubscription(b.shop.subscription)
+
+    if (aActive !== bActive) {
+      return aActive ? -1 : 1
+    }
+
+    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+  })
+
+  const shopAccess: ShopAccessEntry[] = sortedAccess.map((row) => ({
     shop_id: row.shop_id,
     role:    row.role,
     shop:    {
@@ -117,32 +130,24 @@ export async function getUserContext(userId: string): Promise<UserContext> {
   const hasShopAccess =
     userRes.data.role === 'super_admin' || shopAccess.length > 0
 
-  // Subscription is OK if at least one of the user's shops has active/trial sub
-  // For super_admin, subscription is always considered OK
+  // Primary shop = first active subscription, otherwise the oldest membership.
+  const primaryAccess = shopAccess[0] ?? null
   const subscriptionOk =
     userRes.data.role === 'super_admin' ||
-    shopAccess.some((entry) => {
-      const sub = entry.shop.subscription
-      if (!sub) return false
-      return (
-        (sub.status === 'active' || sub.status === 'trial') &&
-        new Date(sub.expires_at) > new Date()
-      )
-    })
-
-  // Primary shop = the first shop with an active subscription, or just the first
-  const activeShop =
-    shopAccess.find((e) => {
-      const sub = e.shop.subscription
-      return sub && (sub.status === 'active' || sub.status === 'trial')
-    }) ?? shopAccess[0]
+    hasActiveSubscription(primaryAccess?.shop.subscription ?? null)
+  const appRole: UserRole =
+    userRes.data.role === 'super_admin'
+      ? 'super_admin'
+      : primaryAccess?.role ?? 'waiter'
 
   return {
     user:           userRes.data,
     shopAccess,
+    appRole,
+    primaryShopRole: primaryAccess?.role ?? null,
     hasShopAccess,
     subscriptionOk,
-    primaryShopId:  activeShop?.shop_id ?? null,
+    primaryShopId:  primaryAccess?.shop_id ?? null,
   }
 }
 
@@ -181,4 +186,15 @@ export class AuthError extends Error {
     super(message)
     this.name = 'AuthError'
   }
+}
+
+function hasActiveSubscription(
+  subscription: { status: string; expires_at: string } | null | undefined,
+) {
+  if (!subscription) return false
+
+  return (
+    (subscription.status === 'active' || subscription.status === 'trial') &&
+    new Date(subscription.expires_at) > new Date()
+  )
 }

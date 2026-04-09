@@ -1,6 +1,6 @@
 'use client'
 
-import type { ApiResponse, AuthResponse } from '@/lib/types'
+import type { ApiResponse, AuthResponse, AuthStatusPayload } from '@/lib/types'
 import { getTelegramInitData, getTelegramWebApp, isInTelegram } from '@/lib/telegram/webapp'
 
 export async function refreshTelegramSession(): Promise<AuthResponse> {
@@ -32,6 +32,11 @@ export async function refreshTelegramSession(): Promise<AuthResponse> {
   return json.data
 }
 
+export async function refreshTelegramSessionAndRedirect() {
+  const auth = await refreshTelegramSession()
+  window.location.replace(resolveAuthDestination(auth))
+}
+
 export async function signOutCurrentSession() {
   await fetch('/api/auth/logout', {
     method: 'POST',
@@ -49,6 +54,17 @@ export async function signOutCurrentSession() {
   }
 
   window.location.replace('/')
+}
+
+export async function loadAuthStatus(): Promise<AuthStatusPayload> {
+  const res = await fetch('/api/auth/status', { cache: 'no-store' })
+  const json: ApiResponse<AuthStatusPayload> = await res.json()
+
+  if (json.error) {
+    throw new Error(json.error.message)
+  }
+
+  return json.data
 }
 
 export function resolveAuthDestination(data: AuthResponse): string {

@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 import { verifySession, SESSION_COOKIE } from '@/lib/auth/session'
-import { createServiceClient } from '@/lib/supabase/server'
 import { ok, err } from '@/lib/utils'
+import { getUserContext } from '@/lib/auth/getUser'
+import type { AuthStatusPayload } from '@/lib/types'
 
 /**
  * GET /api/auth/status
@@ -26,33 +27,21 @@ export async function GET() {
     return NextResponse.json(err('INVALID_SESSION', 'Session invalid or expired'), { status: 401 })
   }
 
-  const supabase  = createServiceClient()
-  const primaryId = payload.primary_shop_id
+  const context = await getUserContext(payload.sub)
+  const primaryShop = context.shopAccess.find((entry) => entry.shop_id === context.primaryShopId) ?? null
+  const subscription = primaryShop?.shop.subscription ?? null
+  const needsRefresh =
+    payload.app_role !== context.appRole
+    || (payload.primary_shop_id ?? null) !== context.primaryShopId
+    || (payload.subscription_ok ?? false) !== context.subscriptionOk
 
-  let shopName: string | null  = null
-  let expiresAt: string | null = null
-  let subStatus: string | null = null
-
-  if (primaryId) {
-    const { data: sub } = await supabase
-      .from('subscriptions')
-      .select('status, expires_at, shop:shops(name)')
-      .eq('shop_id', primaryId)
-      .maybeSingle()
-
-    if (sub) {
-      subStatus  = sub.status
-      expiresAt  = sub.expires_at
-      shopName   = (sub.shop as unknown as { name: string } | null)?.name ?? null
-    }
-  }
-
-  return NextResponse.json(ok({
+  return NextResponse.json(ok<AuthStatusPayload>({
     user_id:         payload.sub,
-    role:            payload.app_role,
-    primary_shop_id: primaryId ?? null,
-    shop_name:       shopName,
-    expires_at:      expiresAt,
-    sub_status:      subStatus,
+    role:            context.appRole,
+    primary_shop_id: context.primaryShopId,
+    shop_name:       primaryShop?.shop.name ?? null,
+    expires_at:      subscription?.expires_at ?? null,
+    sub_status:      subscription?.status ?? null,
+    needs_refresh:   needsRefresh,
   }))
 }

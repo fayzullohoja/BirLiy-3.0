@@ -230,7 +230,14 @@ export default function AdminShopDetailPage() {
     if (!removeTarget?.user_id) return
     setRemoving(true)
     try {
-      await fetch(`/api/admin/shops/${id}/members?user_id=${removeTarget.user_id}`, { method: 'DELETE' })
+      const res = await fetch(`/api/admin/shops/${id}/members?user_id=${removeTarget.user_id}`, { method: 'DELETE' })
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => null)
+        toast.error(json?.error?.message ?? 'Не удалось удалить сотрудника')
+        return
+      }
+
       setRemoveTarget(null)
       toast.success('Сотрудник удалён')
       fetchShop()

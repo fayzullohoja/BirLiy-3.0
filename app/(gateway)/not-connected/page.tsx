@@ -12,7 +12,7 @@ import { refreshTelegramSession, resolveAuthDestination } from '@/lib/auth/clien
  *  - The user is new and hasn't been invited yet.
  *  - Their invite was revoked.
  *
- * The owner must add them via /owner/staff.
+ * An admin or owner must link them to a shop and assign a role.
  */
 export default function NotConnectedPage() {
   const [telegramName, setTelegramName] = useState<string>('')
@@ -53,16 +53,15 @@ export default function NotConnectedPage() {
       {/* Description */}
       <p className="text-sm text-ink-secondary leading-relaxed mb-8">
         Ваш аккаунт Telegram зарегистрирован, но не привязан ни к одному заведению.
-        Попросите вашего руководителя добавить вас через раздел&nbsp;
-        <span className="font-semibold text-ink">«Персонал»</span>.
+        Попросите администратора или владельца привязать вас к заведению и назначить роль.
       </p>
 
       {/* Instruction steps */}
       <div className="card p-4 text-left mb-8 space-y-3">
         <p className="section-label">Что делать</p>
         <Step n={1} text="Сообщите владельцу заведения ваш Telegram-аккаунт" />
-        <Step n={2} text="Он добавит вас в разделе «Персонал → Официанты»" />
-        <Step n={3} text="После добавления перезапустите приложение" />
+        <Step n={2} text="Он привяжет вас к нужному заведению и назначит роль" />
+        <Step n={3} text="После этого нажмите «Проверить снова» или перезапустите приложение" />
       </div>
 
       {/* Retry button */}

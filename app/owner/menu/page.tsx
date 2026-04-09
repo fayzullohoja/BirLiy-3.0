@@ -5,6 +5,7 @@ import AppHeader from '@/components/layout/AppHeader'
 import PageContainer, { Section, EmptyState } from '@/components/ui/PageContainer'
 import Badge from '@/components/ui/Badge'
 import { BottomSheet } from '@/components/ui/BottomSheet'
+import { toast } from '@/components/ui/Toast'
 import { formatUZS } from '@/lib/utils'
 import { useOwnerSession } from '../_context/OwnerSessionContext'
 import type { MenuCategory, MenuItem } from '@/lib/types'
@@ -113,20 +114,42 @@ export default function OwnerMenuPage() {
   async function handleDelete() {
     if (!deleteTarget) return
     setSaving(true)
-    await fetch(
-      deleteTarget.type === 'item' ? `/api/menu/${deleteTarget.id}` : `/api/categories/${deleteTarget.id}`,
-      { method: 'DELETE' },
-    ).finally(() => setSaving(false))
-    setDelete(null)
-    if (activeCat === deleteTarget.id) setActiveCat(null)
-    fetchAll()
+    try {
+      const res = await fetch(
+        deleteTarget.type === 'item' ? `/api/menu/${deleteTarget.id}` : `/api/categories/${deleteTarget.id}`,
+        { method: 'DELETE' },
+      )
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => null)
+        const message = json?.error?.message ?? 'Не удалось удалить запись'
+        toast.error(message)
+        return
+      }
+
+      const json = res.status === 204 ? null : await res.json().catch(() => null)
+      const message = json?.data?.message
+      setDelete(null)
+      if (activeCat === deleteTarget.id) setActiveCat(null)
+      toast.success(message ?? 'Изменения сохранены')
+      fetchAll()
+    } finally {
+      setSaving(false)
+    }
   }
 
   async function toggleAvailable(item: MenuItem) {
-    await fetch(`/api/menu/${item.id}`, {
+    const res = await fetch(`/api/menu/${item.id}`, {
       method: 'PATCH', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ is_available: !item.is_available }),
     })
+
+    if (!res.ok) {
+      const json = await res.json().catch(() => null)
+      toast.error(json?.error?.message ?? 'Не удалось обновить доступность позиции')
+      return
+    }
+
     fetchAll()
   }
 

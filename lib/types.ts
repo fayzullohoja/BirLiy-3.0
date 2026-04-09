@@ -174,6 +174,8 @@ export interface RequestUser {
 export interface UserContext {
   user:             AppUser
   shopAccess:       ShopAccessEntry[]
+  appRole:          UserRole
+  primaryShopRole:  ShopUserRole | null
   hasShopAccess:    boolean
   subscriptionOk:   boolean
   primaryShopId:    string | null
@@ -210,4 +212,14 @@ export interface AuthResponse {
   has_shop_access:   boolean
   subscription_ok:   boolean
   primary_shop_id:   string | null
+}
+
+export interface AuthStatusPayload {
+  user_id:         string
+  role:            UserRole
+  primary_shop_id: string | null
+  shop_name:       string | null
+  expires_at:      string | null
+  sub_status:      string | null
+  needs_refresh:   boolean
 }

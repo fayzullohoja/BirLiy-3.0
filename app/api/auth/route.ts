@@ -25,6 +25,7 @@ import { ok, err } from '@/lib/utils'
 import type { AuthResponse, UserRole } from '@/lib/types'
 
 const IS_DEV = process.env.NODE_ENV === 'development'
+const DEV_DEMO_SHOP_ID = '00000000-0000-0000-0000-000000000001'
 
 export async function POST(req: NextRequest) {
   try {
@@ -145,7 +146,7 @@ async function upsertUserAndRespond(opts: {
   const shopIds       = context.shopAccess.map((e) => e.shop_id)
   const sessionToken  = await signSession({
     userId:         userId,
-    appRole:        context.user.role,
+    appRole:        context.appRole,
     shopIds,
     primaryShopId:  context.primaryShopId,
     subscriptionOk: context.subscriptionOk,
@@ -154,7 +155,7 @@ async function upsertUserAndRespond(opts: {
   // 6. Set cookie + return response
   const payload: AuthResponse = {
     user:            context.user,
-    role:            context.user.role,
+    role:            context.appRole,
     has_shop_access: context.hasShopAccess,
     subscription_ok: context.subscriptionOk,
     primary_shop_id: context.primaryShopId,
@@ -189,8 +190,10 @@ async function handleDevAuth(devRole: string, telegramId: number) {
 
   if (existingUser) {
     userId = existingUser.id
-    // Elevate role for dev convenience
-    if (existingUser.role !== role) {
+    // Elevate or demote platform role only when super_admin is involved.
+    if (role === 'super_admin' && existingUser.role !== 'super_admin') {
+      await adminClient.from('users').update({ role: 'super_admin' }).eq('id', userId)
+    } else if (role !== 'super_admin' && existingUser.role === 'super_admin') {
       await adminClient.from('users').update({ role }).eq('id', userId)
     }
   } else {
@@ -214,11 +217,26 @@ async function handleDevAuth(devRole: string, telegramId: number) {
     })
   }
 
+  if (role !== 'super_admin') {
+    const shopRole = role as Exclude<UserRole, 'super_admin'>
+    const { error: membershipError } = await adminClient
+      .from('shop_users')
+      .upsert(
+        { shop_id: DEV_DEMO_SHOP_ID, user_id: userId, role: shopRole },
+        { onConflict: 'shop_id,user_id' },
+      )
+
+    if (membershipError) {
+      console.error('[auth] dev membership upsert failed:', membershipError)
+      return NextResponse.json(err('DEV_AUTH_ERROR', 'Failed to assign dev user to demo shop'), { status: 500 })
+    }
+  }
+
   const context      = await getUserContext(userId)
   const shopIds      = context.shopAccess.map((e) => e.shop_id)
   const sessionToken = await signSession({
     userId,
-    appRole:        context.user.role,
+    appRole:        context.appRole,
     shopIds,
     primaryShopId:  context.primaryShopId,
     subscriptionOk: context.subscriptionOk,
@@ -226,7 +244,7 @@ async function handleDevAuth(devRole: string, telegramId: number) {
 
   const payload: AuthResponse = {
     user:            context.user,
-    role:            context.user.role,
+    role:            context.appRole,
     has_shop_access: context.hasShopAccess,
     subscription_ok: context.subscriptionOk,
     primary_shop_id: context.primaryShopId,

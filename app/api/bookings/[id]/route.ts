@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { requireAuth, requireOwnerAccess } from '@/lib/auth/apiGuard'
-import { verifyShopAccess } from '@/lib/auth/getUser'
+import { requireOwnerAccess } from '@/lib/auth/apiGuard'
 import { err, ok } from '@/lib/utils'
 import type { BookingStatus, TableBooking } from '@/lib/types'
 
@@ -16,7 +15,7 @@ const VALID_STATUSES: BookingStatus[] = ['confirmed', 'seated', 'cancelled', 'no
  *   - seated    → set table to 'occupied' (if currently free/reserved)
  *   - cancelled/no_show → no automatic table change (owner handles it)
  *
- * Requires: any shop member.
+ * Requires: owner.
  */
 export async function PATCH(
   req: NextRequest,
@@ -26,10 +25,6 @@ export async function PATCH(
     const { id }     = await params
     const body       = await req.json()
     const supabase   = createServiceClient()
-
-    const authResult = await requireAuth()
-    if (!authResult.ok) return authResult.response
-    const { userId, role } = authResult.value
 
     const { data: booking } = await supabase
       .from('table_bookings')
@@ -41,10 +36,8 @@ export async function PATCH(
       return NextResponse.json(err('NOT_FOUND', 'Booking not found'), { status: 404 })
     }
 
-    const shopRole = await verifyShopAccess(userId, role, booking.shop_id)
-    if (!shopRole) {
-      return NextResponse.json(err('FORBIDDEN', 'No access to this shop'), { status: 403 })
-    }
+    const guard = await requireOwnerAccess(booking.shop_id)
+    if (!guard.ok) return guard.response
 
     if (body.status && !VALID_STATUSES.includes(body.status)) {
       return NextResponse.json(

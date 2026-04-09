@@ -5,6 +5,7 @@ import AppHeader from '@/components/layout/AppHeader'
 import PageContainer, { Section, EmptyState } from '@/components/ui/PageContainer'
 import Badge, { type BadgeVariant } from '@/components/ui/Badge'
 import { BottomSheet } from '@/components/ui/BottomSheet'
+import { toast } from '@/components/ui/Toast'
 import { formatTime, formatDate } from '@/lib/utils'
 import { useOwnerSession } from '../_context/OwnerSessionContext'
 import type { Table, TableBooking, BookingStatus } from '@/lib/types'
@@ -138,22 +139,46 @@ export default function OwnerBookingsPage() {
   // ── Update status ─────────────────────────────────────────────────────────────
   async function updateStatus(booking: TableBooking, status: BookingStatus) {
     setSaving(true)
-    await fetch(`/api/bookings/${booking.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
-    }).finally(() => setSaving(false))
-    setStatusSheet(null)
-    fetchData()
+    try {
+      const res = await fetch(`/api/bookings/${booking.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+
+      const json = await res.json().catch(() => null)
+      if (!res.ok || json?.error) {
+        toast.error(json?.error?.message ?? 'Не удалось обновить бронирование')
+        return
+      }
+
+      setStatusSheet(null)
+      toast.success('Статус бронирования обновлён')
+      fetchData()
+    } finally {
+      setSaving(false)
+    }
   }
 
   // ── Delete ────────────────────────────────────────────────────────────────────
   async function handleDelete() {
     if (!deleteTarget) return
     setSaving(true)
-    await fetch(`/api/bookings/${deleteTarget.id}`, { method: 'DELETE' }).finally(() => setSaving(false))
-    setDeleteTarget(null)
-    fetchData()
+    try {
+      const res = await fetch(`/api/bookings/${deleteTarget.id}`, { method: 'DELETE' })
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => null)
+        toast.error(json?.error?.message ?? 'Не удалось удалить бронирование')
+        return
+      }
+
+      setDeleteTarget(null)
+      toast.success('Бронирование удалено')
+      fetchData()
+    } finally {
+      setSaving(false)
+    }
   }
 
   // ─── Render ───────────────────────────────────────────────────────────────

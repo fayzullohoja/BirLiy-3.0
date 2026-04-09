@@ -42,18 +42,6 @@ export async function POST(
     return NextResponse.json(err('NOT_FOUND', 'User not found'), { status: 404 })
   }
 
-  if (user.role !== 'super_admin' && user.role !== role) {
-    const { error: roleError } = await supabase
-      .from('users')
-      .update({ role })
-      .eq('id', user_id)
-
-    if (roleError) {
-      console.error('[admin/shops/[id]/members POST role sync]', roleError)
-      return NextResponse.json(err('DB_ERROR', 'Failed to sync user role'), { status: 500 })
-    }
-  }
-
   // Upsert membership
   const { data, error } = await supabase
     .from('shop_users')

@@ -6,6 +6,7 @@ import PageContainer, { Section, EmptyState } from '@/components/ui/PageContaine
 import { CardSection, ListItem } from '@/components/ui/Card'
 import Badge from '@/components/ui/Badge'
 import { BottomSheet } from '@/components/ui/BottomSheet'
+import { toast } from '@/components/ui/Toast'
 import { useOwnerSession } from '../_context/OwnerSessionContext'
 import type { ShopUser } from '@/lib/types'
 
@@ -46,12 +47,24 @@ export default function OwnerStaffPage() {
   async function handleRemove() {
     if (!deleteTarget?.user) return
     setDeleting(true)
-    await fetch(
-      `/api/staff?shop_id=${session.primaryShopId}&user_id=${deleteTarget.user.id}`,
-      { method: 'DELETE' },
-    ).finally(() => setDeleting(false))
-    setDelete(null)
-    fetchStaff()
+    try {
+      const res = await fetch(
+        `/api/staff?shop_id=${session.primaryShopId}&user_id=${deleteTarget.user.id}`,
+        { method: 'DELETE' },
+      )
+
+      if (!res.ok) {
+        const json = await res.json().catch(() => null)
+        toast.error(json?.error?.message ?? 'Не удалось удалить сотрудника')
+        return
+      }
+
+      setDelete(null)
+      toast.success('Сотрудник удалён')
+      fetchStaff()
+    } finally {
+      setDeleting(false)
+    }
   }
 
   const waiters = staff.filter(s => s.role === 'waiter')
@@ -140,11 +153,11 @@ export default function OwnerStaffPage() {
         {!loading && !error && (
           <div className="mx-4 mt-2 mb-6 p-4 rounded-2xl bg-blue-50 border border-blue-200">
             <p className="text-xs font-semibold text-blue-700 mb-1">Как добавить сотрудника?</p>
-            <p className="text-xs text-blue-600">
-              Поделитесь ссылкой на бот с сотрудником. При первом входе он появится в системе. После этого привяжите его к ресторану через панель администратора.
-            </p>
-          </div>
-        )}
+          <p className="text-xs text-blue-600">
+              Поделитесь ссылкой на бот с сотрудником. После первого входа его можно будет привязать к ресторану и назначить роль через панель управления.
+          </p>
+        </div>
+      )}
       </PageContainer>
 
       {/* Remove confirmation */}

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { requireShopAccess } from '@/lib/auth/apiGuard'
+import { requireOwnerAccess, requireShopAccess } from '@/lib/auth/apiGuard'
 import { err, ok } from '@/lib/utils'
 import type { TableBooking } from '@/lib/types'
 
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest) {
   try {
     const body   = await req.json()
     const shopId = body?.shop_id as string | undefined
-    const guard  = await requireShopAccess(shopId)
+    const guard  = await requireOwnerAccess(shopId)
     if (!guard.ok) return guard.response
 
     const { userId } = guard.value

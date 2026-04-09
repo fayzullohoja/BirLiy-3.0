@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireSuperAdmin } from '@/lib/auth/apiGuard'
 import { err, ok } from '@/lib/utils'
+import type { ShopUserRole, UserRole } from '@/lib/types'
 
 const VALID_ROLES = ['super_admin', 'owner', 'waiter', 'kitchen'] as const
 const VALID_SHOP_ROLES = ['owner', 'waiter', 'kitchen'] as const
@@ -44,7 +45,7 @@ export async function GET(
     return NextResponse.json(err('DB_ERROR', 'Failed to fetch user'), { status: 500 })
   }
 
-  return NextResponse.json(ok(data))
+  return NextResponse.json(ok(mapAdminUser(data as AdminUserRecord)))
 }
 
 /**
@@ -77,6 +78,20 @@ export async function PATCH(
 
   const supabase = createServiceClient()
   const role = body.role as (typeof VALID_ROLES)[number]
+
+  const { data: existingUser, error: userError } = await supabase
+    .from('users')
+    .select('id, role')
+    .eq('id', id)
+    .single()
+
+  if (userError || !existingUser) {
+    if (userError?.code === 'PGRST116') {
+      return NextResponse.json(err('NOT_FOUND', 'User not found'), { status: 404 })
+    }
+    console.error('[admin/users/[id] PATCH fetch user]', userError)
+    return NextResponse.json(err('DB_ERROR', 'Failed to load user'), { status: 500 })
+  }
 
   let shopId = body.shop_id?.trim() || ''
   const shopRole =
@@ -116,14 +131,16 @@ export async function PATCH(
     )
   }
 
-  const { error: updateError } = await supabase
-    .from('users')
-    .update({ role })
-    .eq('id', id)
+  if (role === 'super_admin' || existingUser.role === 'super_admin') {
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ role })
+      .eq('id', id)
 
-  if (updateError) {
-    console.error('[admin/users/[id] PATCH update role]', updateError)
-    return NextResponse.json(err('DB_ERROR', 'Failed to update user role'), { status: 500 })
+    if (updateError) {
+      console.error('[admin/users/[id] PATCH update role]', updateError)
+      return NextResponse.json(err('DB_ERROR', 'Failed to update user role'), { status: 500 })
+    }
   }
 
   if (role !== 'super_admin') {
@@ -157,5 +174,54 @@ export async function PATCH(
     return NextResponse.json(err('DB_ERROR', 'Failed to fetch updated user'), { status: 500 })
   }
 
-  return NextResponse.json(ok(data))
+  return NextResponse.json(ok(mapAdminUser(data as AdminUserRecord)))
+}
+
+type AdminShopMembership = {
+  id: string
+  role: ShopUserRole
+  shop_id: string
+  created_at?: string
+  shop: { id: string; name: string; is_active: boolean } | { id: string; name: string; is_active: boolean }[] | null
+}
+
+type AdminUserRecord = {
+  id: string
+  telegram_id: number
+  name: string
+  username: string | null
+  role: UserRole
+  created_at: string
+  updated_at: string
+  shops?: AdminShopMembership[]
+}
+
+function mapAdminUser<T extends AdminUserRecord>(user: T): T {
+  const normalizedShops = normalizeMemberships(user.shops ?? [])
+  const primaryMembership = resolvePrimaryMembership(normalizedShops)
+  const effectiveRole: UserRole =
+    user.role === 'super_admin'
+      ? 'super_admin'
+      : primaryMembership?.role ?? user.role
+
+  return {
+    ...user,
+    role: effectiveRole,
+    shops: normalizedShops,
+  }
+}
+
+function resolvePrimaryMembership(shops: AdminShopMembership[]) {
+  return [...shops].sort((a, b) => {
+    const aTime = a.created_at ? new Date(a.created_at).getTime() : 0
+    const bTime = b.created_at ? new Date(b.created_at).getTime() : 0
+    return aTime - bTime
+  })[0] ?? null
+}
+
+function normalizeMemberships(shops: AdminShopMembership[]) {
+  return shops.map((membership) => ({
+    ...membership,
+    shop: Array.isArray(membership.shop) ? membership.shop[0] ?? null : membership.shop,
+  }))
 }

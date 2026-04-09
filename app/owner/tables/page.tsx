@@ -5,6 +5,7 @@ import AppHeader from '@/components/layout/AppHeader'
 import PageContainer, { Section, EmptyState } from '@/components/ui/PageContainer'
 import { TableStatusBadge } from '@/components/ui/Badge'
 import { BottomSheet } from '@/components/ui/BottomSheet'
+import { toast } from '@/components/ui/Toast'
 import { useOwnerSession } from '../_context/OwnerSessionContext'
 import type { Table, TableStatus } from '@/lib/types'
 
@@ -126,15 +127,24 @@ export default function OwnerTablesPage() {
   async function handleDelete() {
     if (!confirmDelete) return
     setSaving(true)
-    const res = await fetch(`/api/tables/${confirmDelete.id}`, { method: 'DELETE' })
-      .finally(() => setSaving(false))
+    setError(null)
+    try {
+      const res = await fetch(`/api/tables/${confirmDelete.id}`, { method: 'DELETE' })
 
-    if (res.status === 409) {
-      setError('Нельзя удалить стол с активным заказом')
+      if (!res.ok) {
+        const json = await res.json().catch(() => null)
+        const message = json?.error?.message ?? 'Не удалось удалить стол'
+        setError(message)
+        toast.error(message)
+        return
+      }
+
+      setConfirmDelete(null)
+      toast.success('Стол удалён')
+      fetchTables()
+    } finally {
+      setSaving(false)
     }
-
-    setConfirmDelete(null)
-    fetchTables()
   }
 
   // ─── Render ───────────────────────────────────────────────────────────────

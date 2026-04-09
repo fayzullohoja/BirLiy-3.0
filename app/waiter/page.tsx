@@ -10,6 +10,8 @@ import { useWaiterSession } from './_context/WaiterSessionContext'
 import type { Table, TableStatus } from '@/lib/types'
 
 const STATUS_ORDER: TableStatus[] = ['bill_requested', 'occupied', 'reserved', 'free']
+const REFRESH_INTERVAL_MS = 15_000
+const LIVE_FETCH_OPTIONS: RequestInit = { cache: 'no-store' }
 
 function sortTables(tables: Table[]): Table[] {
   return [...tables].sort(
@@ -26,24 +28,56 @@ export default function WaiterPage() {
   const [error, setError]     = useState<string | null>(null)
 
   useEffect(() => {
-    if (session.loading) return
+    if (session.loading || !session.primaryShopId) return
     let cancelled = false
 
-    setLoading(true)
-    fetch(`/api/tables?shop_id=${session.primaryShopId}`)
-      .then(r => r.json())
-      .then(res => {
-        if (cancelled) return
-        if (res.error) {
-          setError(res.error.message)
-        } else {
-          setTables(res.data ?? [])
-        }
-      })
-      .catch(() => { if (!cancelled) setError('Не удалось загрузить столы') })
-      .finally(() => { if (!cancelled) setLoading(false) })
+    async function fetchTables(mode: 'initial' | 'refresh' = 'initial') {
+      if (mode === 'initial') setLoading(true)
 
-    return () => { cancelled = true }
+      try {
+        const res = await fetch(
+          `/api/tables?shop_id=${session.primaryShopId}`,
+          LIVE_FETCH_OPTIONS,
+        )
+        const json = await res.json()
+
+        if (cancelled) return
+
+        if (json.error) {
+          if (mode === 'initial') setError(json.error.message)
+          return
+        }
+
+        setError(null)
+        setTables(json.data ?? [])
+      } catch {
+        if (!cancelled && mode === 'initial') {
+          setError('Не удалось загрузить столы')
+        }
+      } finally {
+        if (!cancelled && mode === 'initial') {
+          setLoading(false)
+        }
+      }
+    }
+
+    void fetchTables('initial')
+
+    const refresh = () => { void fetchTables('refresh') }
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') refresh()
+    }
+
+    const intervalId = window.setInterval(refresh, REFRESH_INTERVAL_MS)
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', onVisibilityChange)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
   }, [session.loading, session.primaryShopId])
 
   const sorted       = sortTables(tables)
