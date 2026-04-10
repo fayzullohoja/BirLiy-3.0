@@ -23,12 +23,14 @@ ALTER TABLE public.order_items
   ADD COLUMN IF NOT EXISTS ready_at TIMESTAMPTZ;
 
 UPDATE public.order_items oi
-SET status = CASE o.status
+SET status = (
+      CASE o.status
       WHEN 'in_kitchen' THEN 'in_kitchen'
       WHEN 'ready' THEN 'ready'
       WHEN 'paid' THEN 'ready'
       ELSE 'pending'
-    END,
+      END
+    )::public.order_item_status,
     sent_to_kitchen_at = CASE
       WHEN o.status IN ('in_kitchen', 'ready', 'paid') THEN COALESCE(oi.sent_to_kitchen_at, o.updated_at, o.created_at)
       ELSE oi.sent_to_kitchen_at
@@ -93,12 +95,14 @@ BEGIN
     RETURN NEW;
   END IF;
 
-  v_next_status := CASE
+  v_next_status := (
+    CASE
     WHEN v_has_in_kitchen THEN 'in_kitchen'
     WHEN v_has_pending THEN 'open'
     WHEN v_has_ready THEN 'ready'
     ELSE 'open'
-  END;
+    END
+  )::public.order_status;
 
   UPDATE public.orders
   SET total_amount = v_total_amount,
@@ -123,13 +127,15 @@ CREATE TRIGGER trg_recalc_order_snapshot_delete
 
 UPDATE public.orders o
 SET total_amount = totals.total_amount,
-    status = CASE
+    status = (
+      CASE
       WHEN o.status IN ('paid', 'cancelled') THEN o.status
       WHEN totals.has_in_kitchen THEN 'in_kitchen'
       WHEN totals.has_pending THEN 'open'
       WHEN totals.has_ready THEN 'ready'
       ELSE 'open'
-    END
+      END
+    )::public.order_status
 FROM (
   SELECT
     order_id,
