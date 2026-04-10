@@ -12,6 +12,7 @@ import { useKitchenSession } from './_context/KitchenSessionContext'
 import type { ApiResponse, Order, OrderItem } from '@/lib/types'
 
 const REFRESH_INTERVAL_MS = 15_000
+const LIVE_FETCH_OPTIONS: RequestInit = { cache: 'no-store' }
 
 export default function KitchenPage() {
   const session = useKitchenSession()
@@ -29,14 +30,23 @@ export default function KitchenPage() {
     if (mode === 'refresh') setRefreshing(true)
 
     try {
-      const res = await fetch(`/api/orders?shop_id=${session.primaryShopId}&status=in_kitchen`)
+      const res = await fetch(
+        `/api/orders?shop_id=${session.primaryShopId}&status=in_kitchen`,
+        LIVE_FETCH_OPTIONS,
+      )
       const json: ApiResponse<Order[]> = await res.json()
       if (json.error) {
         if (mode === 'initial') setError(json.error.message)
         return
       }
       setError(null)
-      setOrders(json.data ?? [])
+      const queue = (json.data ?? [])
+        .map((order) => ({
+          ...order,
+          items: (order.items ?? []).filter((item) => item.status === 'in_kitchen'),
+        }))
+        .filter((order) => (order.items?.length ?? 0) > 0)
+      setOrders(queue)
     } catch {
       if (mode === 'initial') setError('Не удалось загрузить очередь кухни')
     } finally {
@@ -48,13 +58,20 @@ export default function KitchenPage() {
   useEffect(() => {
     if (session.loading || !session.primaryShopId) return
 
-    fetchOrders('initial')
-    const intervalId = window.setInterval(() => {
-      fetchOrders('refresh')
-    }, REFRESH_INTERVAL_MS)
+    void fetchOrders('initial')
+    const refresh = () => { void fetchOrders('refresh') }
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') refresh()
+    }
+
+    const intervalId = window.setInterval(refresh, REFRESH_INTERVAL_MS)
+    window.addEventListener('focus', refresh)
+    document.addEventListener('visibilitychange', onVisibilityChange)
 
     return () => {
       window.clearInterval(intervalId)
+      window.removeEventListener('focus', refresh)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
     }
   }, [fetchOrders, session.loading, session.primaryShopId])
 
@@ -62,7 +79,7 @@ export default function KitchenPage() {
     const itemCount = orders.reduce((sum, order) => (
       sum + (order.items?.reduce((itemSum, item) => itemSum + item.quantity, 0) ?? 0)
     ), 0)
-    const elapsed = orders.map(order => getElapsedMinutes(order.created_at))
+    const elapsed = orders.map(order => getElapsedMinutes(getKitchenBatchStartedAt(order)))
     const overdue = elapsed.filter(min => min >= 20).length
     const avgWait = elapsed.length > 0
       ? Math.round(elapsed.reduce((sum, min) => sum + min, 0) / elapsed.length)
@@ -70,6 +87,12 @@ export default function KitchenPage() {
 
     return { itemCount, overdue, avgWait }
   }, [orders])
+
+  const queueOrders = useMemo(() => (
+    [...orders].sort(
+      (a, b) => new Date(getKitchenBatchStartedAt(a)).getTime() - new Date(getKitchenBatchStartedAt(b)).getTime(),
+    )
+  ), [orders])
 
   async function handleReady(orderId: string) {
     setUpdatingId(orderId)
@@ -138,7 +161,7 @@ export default function KitchenPage() {
                 </Button>
               )}
             />
-          ) : orders.length === 0 ? (
+          ) : queueOrders.length === 0 ? (
             <EmptyState
               icon={<ChefIcon />}
               title="Очередь пуста"
@@ -146,7 +169,7 @@ export default function KitchenPage() {
             />
           ) : (
             <div className="space-y-3">
-              {orders.map(order => (
+              {queueOrders.map(order => (
                 <KitchenOrderCard
                   key={order.id}
                   order={order}
@@ -171,9 +194,10 @@ function KitchenOrderCard({
   loading: boolean
   onReady: () => void
 }) {
-  const elapsed = getElapsedMinutes(order.created_at)
+  const elapsed = getElapsedMinutes(getKitchenBatchStartedAt(order))
   const urgent = elapsed >= 20
-  const itemCount = order.items?.reduce((sum, item) => sum + item.quantity, 0) ?? 0
+  const queueItems = order.items ?? []
+  const itemCount = queueItems.reduce((sum, item) => sum + item.quantity, 0)
 
   return (
     <Card className={urgent ? 'border-amber-300 bg-amber-50/40' : undefined}>
@@ -188,7 +212,7 @@ function KitchenOrderCard({
               <TimePill elapsed={elapsed} urgent={urgent} />
             </div>
             <p className="text-sm text-ink-secondary mt-1">
-              {order.waiter?.name ?? 'Без официанта'} · {pluralRu(itemCount, 'позиция', 'позиции', 'позиций')} · {formatTime(order.created_at)}
+              {order.waiter?.name ?? 'Без официанта'} · {pluralRu(itemCount, 'позиция', 'позиции', 'позиций')} · {formatTime(getKitchenBatchStartedAt(order))}
             </p>
           </div>
           <div className="text-right shrink-0">
@@ -218,7 +242,7 @@ function KitchenOrderCard({
             </span>
           </div>
           <div className="divide-y divide-surface-border">
-            {order.items?.map(item => (
+            {queueItems.map(item => (
               <KitchenItemRow key={item.id} item={item} />
             ))}
           </div>
@@ -307,6 +331,14 @@ function KitchenSkeleton() {
 
 function getElapsedMinutes(iso: string) {
   return Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 60_000))
+}
+
+function getKitchenBatchStartedAt(order: Order) {
+  const timestamps = (order.items ?? [])
+    .map((item) => item.sent_to_kitchen_at ?? item.created_at)
+    .filter(Boolean)
+
+  return timestamps.sort()[0] ?? order.updated_at ?? order.created_at
 }
 
 function RefreshIcon() {

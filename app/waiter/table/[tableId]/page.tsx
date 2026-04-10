@@ -3,9 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { BottomSheet } from '@/components/ui/BottomSheet'
+import { OrderItemStatusBadge } from '@/components/ui/Badge'
 import { toast } from '@/components/ui/Toast'
 import { useWaiterSession } from '../../_context/WaiterSessionContext'
-import { formatUZS, formatTime, PAYMENT_TYPE_LABELS, ORDER_STATUS_LABELS } from '@/lib/utils'
+import { formatUZS, formatTime, PAYMENT_TYPE_LABELS, ORDER_STATUS_LABELS, pluralRu } from '@/lib/utils'
 import type { Order, OrderItem, PaymentType, Table } from '@/lib/types'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -22,6 +23,13 @@ const SUCCESS_MESSAGES: Partial<Record<'in_kitchen' | 'ready' | 'paid' | 'cancel
   ready: 'Заказ отмечен как готовый',
   paid: 'Оплата принята',
   cancelled: 'Заказ отменён',
+}
+
+interface OrderItemSummary {
+  totalItems: number
+  pendingItems: number
+  inKitchenItems: number
+  readyItems: number
 }
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
@@ -194,7 +202,8 @@ export default function TableDetailPage() {
 
   const { table, order } = data
   const items = order?.items ?? []
-  const canEdit = !order || order.status === 'open'
+  const itemSummary = getOrderItemSummary(order)
+  const canAddMore = Boolean(order && !['paid', 'cancelled'].includes(order.status))
 
   return (
     <div className="min-h-screen flex flex-col bg-surface-muted pb-[env(safe-area-inset-bottom)]">
@@ -260,7 +269,7 @@ export default function TableDetailPage() {
                     <OrderItemRow
                       key={item.id}
                       item={item}
-                      editable={canEdit && !actionLoading}
+                      editable={item.status === 'pending' && !actionLoading && order.status !== 'paid' && order.status !== 'cancelled'}
                       onPlus={()  => adjustQty(item, +1)}
                       onMinus={() => adjustQty(item, -1)}
                       isLast={idx === items.length - 1}
@@ -277,7 +286,7 @@ export default function TableDetailPage() {
             </div>
 
             {/* Add more items button (only while editable) */}
-            {canEdit && (
+            {canAddMore && (
               <button
                 onClick={() => router.push(`/waiter/table/${tableId}/menu?orderId=${order.id}`)}
                 className="w-full py-3 rounded-2xl border-2 border-dashed border-brand-500 text-brand-600 font-medium text-sm flex items-center justify-center gap-2 active:bg-green-50 transition-colors"
@@ -296,6 +305,7 @@ export default function TableDetailPage() {
       {order && (
         <ActionBar
           order={order}
+          summary={itemSummary}
           loading={actionLoading}
           onTransition={transitionOrder}
           onPaymentSheet={() => setPaymentSheet(true)}
@@ -338,8 +348,14 @@ function OrderItemRow({
   return (
     <li className={`flex items-center gap-3 px-4 py-3 ${isLast ? '' : ''}`}>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-ink truncate">{name}</p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-sm font-medium text-ink truncate">{name}</p>
+          <OrderItemStatusBadge status={item.status} />
+        </div>
         <p className="text-xs text-ink-muted">{formatUZS(item.unit_price)} × {item.quantity}</p>
+        {item.notes && (
+          <p className="text-xs text-ink-secondary mt-1">{item.notes}</p>
+        )}
       </div>
       <div className="flex items-center gap-2 shrink-0">
         {editable && (
@@ -375,45 +391,55 @@ function OrderItemRow({
 
 function ActionBar({
   order,
+  summary,
   loading,
   onTransition,
   onPaymentSheet,
   onRefresh,
 }: {
   order: Order
+  summary: OrderItemSummary
   loading: boolean
   onTransition: (status: string, payment?: PaymentType) => void
   onPaymentSheet: () => void
   onRefresh: () => void
 }) {
   const status = order.status
+  const hasPending = summary.pendingItems > 0
+  const hasKitchen = summary.inKitchenItems > 0
+  const hasReady = summary.readyItems > 0
+  const canPay = hasReady && !hasPending && !hasKitchen
+  const canCancel = summary.totalItems > 0 && summary.pendingItems === summary.totalItems
 
   return (
     <div className="sticky bottom-0 bg-surface border-t border-surface-border px-4 pt-3 pb-safe flex flex-col gap-2">
-      {status === 'open' && (
+      {hasPending && (
         <div className="flex gap-2">
           <button
             onClick={() => onTransition('in_kitchen')}
-            disabled={loading || (order.items ?? []).length === 0}
+            disabled={loading}
             className="flex-1 py-3.5 rounded-2xl bg-brand-600 text-white font-semibold text-sm disabled:opacity-50 active:scale-95 transition-transform"
           >
-            На кухню
-          </button>
-          <button
-            onClick={onPaymentSheet}
-            disabled={loading || (order.items ?? []).length === 0}
-            className="flex-1 py-3.5 rounded-2xl bg-surface-muted text-ink-secondary font-semibold text-sm border border-surface-border disabled:opacity-50 active:scale-95 transition-transform"
-          >
-            Оплатить
+            На кухню{summary.pendingItems > 0 ? ` · ${pluralRu(summary.pendingItems, 'позиция', 'позиции', 'позиций')}` : ''}
           </button>
         </div>
       )}
-      {status === 'in_kitchen' && (
+
+      {hasPending && hasReady && !hasKitchen && (
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-3">
+          <p className="text-sm font-semibold text-blue-900">Есть готовые и новые позиции</p>
+          <p className="text-xs text-blue-800 mt-1">
+            Сначала отправьте новые позиции на кухню. Общий счёт можно закрыть только когда в заказе не останется новых или готовящихся блюд.
+          </p>
+        </div>
+      )}
+
+      {hasKitchen && (
         <>
           <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
             <p className="text-sm font-semibold text-amber-900">Заказ уже на кухне</p>
             <p className="text-xs text-amber-800 mt-1">
-              Кухня этого заведения видит его в очереди. Когда повар отметит заказ готовым, статус обновится здесь автоматически.
+              {pluralRu(summary.inKitchenItems, 'Позиция', 'Позиции', 'Позиций')} на кухне. Когда повар отметит текущую волну готовой, статус обновится здесь автоматически.
             </p>
           </div>
           <button
@@ -425,24 +451,33 @@ function ActionBar({
           </button>
         </>
       )}
-      {status === 'ready' && (
+
+      {hasReady && (
         <>
           <div className="rounded-2xl border border-green-200 bg-green-50 px-4 py-3">
-            <p className="text-sm font-semibold text-green-900">Заказ готов к выдаче</p>
+            <p className="text-sm font-semibold text-green-900">
+              {canPay ? 'Заказ готов к выдаче' : 'Часть заказа уже готова'}
+            </p>
             <p className="text-xs text-green-800 mt-1">
-              Передайте заказ гостю и только потом принимайте оплату.
+              {canPay
+                ? 'Передайте заказ гостю и только потом принимайте оплату.'
+                : `Готово: ${pluralRu(summary.readyItems, 'позиция', 'позиции', 'позиций')}. Оплата станет доступна, когда не останется новых или готовящихся блюд.`}
             </p>
           </div>
-          <button
-            onClick={onPaymentSheet}
-            disabled={loading}
-            className="w-full py-3.5 rounded-2xl bg-brand-600 text-white font-semibold text-base disabled:opacity-50 active:scale-95 transition-transform"
-          >
-            Принять оплату
-          </button>
         </>
       )}
-      {status === 'open' && (
+
+      {canPay && (
+        <button
+          onClick={onPaymentSheet}
+          disabled={loading}
+          className="w-full py-3.5 rounded-2xl bg-brand-600 text-white font-semibold text-base disabled:opacity-50 active:scale-95 transition-transform"
+        >
+          Принять оплату
+        </button>
+      )}
+
+      {canCancel && status === 'open' && (
         <button
           onClick={() => onTransition('cancelled')}
           disabled={loading}
@@ -453,6 +488,23 @@ function ActionBar({
       )}
     </div>
   )
+}
+
+function getOrderItemSummary(order: Order | null): OrderItemSummary {
+  const items = order?.items ?? []
+
+  return items.reduce<OrderItemSummary>((summary, item) => {
+    summary.totalItems += item.quantity
+    if (item.status === 'pending') summary.pendingItems += item.quantity
+    if (item.status === 'in_kitchen') summary.inKitchenItems += item.quantity
+    if (item.status === 'ready') summary.readyItems += item.quantity
+    return summary
+  }, {
+    totalItems: 0,
+    pendingItems: 0,
+    inKitchenItems: 0,
+    readyItems: 0,
+  })
 }
 
 // ─── Payment Sheet ────────────────────────────────────────────────────────────

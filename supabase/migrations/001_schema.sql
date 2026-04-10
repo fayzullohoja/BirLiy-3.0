@@ -9,6 +9,7 @@ CREATE TYPE public.user_role      AS ENUM ('super_admin', 'owner', 'waiter', 'ki
 CREATE TYPE public.shop_user_role AS ENUM ('owner', 'waiter', 'kitchen');
 CREATE TYPE public.table_status   AS ENUM ('free', 'occupied', 'reserved', 'bill_requested');
 CREATE TYPE public.order_status   AS ENUM ('open', 'in_kitchen', 'ready', 'paid', 'cancelled');
+CREATE TYPE public.order_item_status AS ENUM ('pending', 'in_kitchen', 'ready');
 CREATE TYPE public.payment_type   AS ENUM ('cash', 'card');
 CREATE TYPE public.booking_status AS ENUM ('confirmed', 'seated', 'cancelled', 'no_show');
 CREATE TYPE public.sub_status     AS ENUM ('trial', 'active', 'expired', 'suspended');
@@ -159,11 +160,15 @@ CREATE TABLE public.order_items (
   menu_item_id  UUID        NOT NULL REFERENCES public.menu_items(id) ON DELETE RESTRICT,
   quantity      INTEGER     NOT NULL CHECK (quantity BETWEEN 1 AND 999),
   unit_price    INTEGER     NOT NULL CHECK (unit_price >= 0),
+  status        public.order_item_status NOT NULL DEFAULT 'pending',
   notes         TEXT,
+  sent_to_kitchen_at TIMESTAMPTZ,
+  ready_at      TIMESTAMPTZ,
   created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX order_items_order_id_idx ON public.order_items (order_id);
+CREATE INDEX order_items_status_idx ON public.order_items (order_id, status);
 
 -- ─── Table Bookings ───────────────────────────────────────────────────────────
 

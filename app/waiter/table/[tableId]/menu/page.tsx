@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { useWaiterSession } from '../../../_context/WaiterSessionContext'
+import { toast } from '@/components/ui/Toast'
 import { formatUZS } from '@/lib/utils'
 import type { MenuCategory, MenuItem } from '@/lib/types'
 
@@ -129,6 +130,7 @@ export default function MenuSelectionPage() {
       router.push(`/waiter/table/${tableId}`)
     } catch (e) {
       console.error('[menu submit]', e)
+      toast.error(e instanceof Error ? e.message : 'Не удалось сохранить позиции')
       setSubmitting(false)
     }
   }

@@ -4,6 +4,7 @@ export type UserRole      = 'super_admin' | 'owner' | 'waiter' | 'kitchen'
 export type ShopUserRole  = 'owner' | 'waiter' | 'kitchen'
 export type TableStatus   = 'free' | 'occupied' | 'reserved' | 'bill_requested'
 export type OrderStatus   = 'open' | 'in_kitchen' | 'ready' | 'paid' | 'cancelled'
+export type OrderItemStatus = 'pending' | 'in_kitchen' | 'ready'
 export type PaymentType   = 'cash' | 'card' | 'payme' | 'click'
 export type BookingStatus = 'confirmed' | 'seated' | 'cancelled' | 'no_show'
 export type SubStatus     = 'trial' | 'active' | 'expired' | 'suspended'
@@ -109,7 +110,10 @@ export interface OrderItem {
   menu_item_id: string
   quantity:     number
   unit_price:   number
+  status:       OrderItemStatus
   notes:        string | null
+  sent_to_kitchen_at: string | null
+  ready_at:     string | null
   created_at:   string
   // Joined
   menu_item?:   MenuItem

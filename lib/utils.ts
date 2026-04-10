@@ -95,6 +95,12 @@ export const ORDER_STATUS_LABELS: Record<string, string> = {
   cancelled:   'Отменён',
 }
 
+export const ORDER_ITEM_STATUS_LABELS: Record<string, string> = {
+  pending:     'Новый',
+  in_kitchen:  'На кухне',
+  ready:       'Готово',
+}
+
 // ─── Misc ─────────────────────────────────────────────────────────────────────
 
 export function pluralRu(n: number, one: string, few: string, many: string): string {

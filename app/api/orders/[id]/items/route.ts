@@ -9,7 +9,8 @@ import type { Order } from '@/lib/types'
  * POST /api/orders/[id]/items
  *
  * Adds one or more items to an existing order.
- * Order must stay in 'open' status.
+ * New items are always added as 'pending', so a single active order can be
+ * sent to the kitchen in multiple waves.
  * Prices are always taken from the DB (menu_items.price), not the client.
  *
  * Body: { items: Array<{ menu_item_id: string; quantity: number; notes?: string }> }
@@ -55,7 +56,7 @@ export async function POST(
 
     const supabase = createServiceClient()
 
-    // Fetch order to verify it exists and is in an editable state
+    // Fetch order to verify it exists and can still accept additions
     const { data: order, error: fetchErr } = await supabase
       .from('orders')
       .select('id, shop_id, waiter_id, status')
@@ -66,7 +67,7 @@ export async function POST(
       return NextResponse.json(err('NOT_FOUND', 'Order not found'), { status: 404 })
     }
 
-    if (order.status !== 'open') {
+    if (['paid', 'cancelled'].includes(order.status)) {
       return NextResponse.json(
         err('ORDER_NOT_EDITABLE', `Cannot add items to an order with status '${order.status}'`),
         { status: 422 },
@@ -136,6 +137,7 @@ export async function POST(
       menu_item_id: item.menu_item_id,
       quantity:     item.quantity,
       unit_price:   priceMap.get(item.menu_item_id)!,
+      status:       'pending' as const,
       notes:        item.notes ?? null,
     }))
 

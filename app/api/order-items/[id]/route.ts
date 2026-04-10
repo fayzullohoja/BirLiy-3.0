@@ -8,8 +8,8 @@ import type { Order } from '@/lib/types'
 /**
  * PATCH /api/order-items/[id]
  *
- * Updates quantity (and optionally notes) of an existing order item.
- * Order must stay in 'open' status.
+ * Updates quantity (and optionally notes) of an existing pending order item.
+ * Once a position has been sent to the kitchen, it becomes read-only for the waiter.
  * DB trigger recalculates order total automatically.
  *
  * Body: { quantity: number; notes?: string }
@@ -40,7 +40,7 @@ export async function PATCH(
     // Fetch the order item with its parent order
     const { data: orderItem, error: fetchErr } = await supabase
       .from('order_items')
-      .select('id, order_id, order:orders(id, shop_id, waiter_id, status)')
+      .select('id, order_id, status, order:orders(id, shop_id, waiter_id, status)')
       .eq('id', id)
       .single()
 
@@ -52,9 +52,16 @@ export async function PATCH(
       id: string; shop_id: string; waiter_id: string; status: string
     }
 
-    if (order.status !== 'open') {
+    if (['paid', 'cancelled'].includes(order.status)) {
       return NextResponse.json(
         err('ORDER_NOT_EDITABLE', `Cannot modify items on an order with status '${order.status}'`),
+        { status: 422 },
+      )
+    }
+
+    if (orderItem.status !== 'pending') {
+      return NextResponse.json(
+        err('ITEM_NOT_EDITABLE', 'Only pending items can be edited before they are sent to the kitchen'),
         { status: 422 },
       )
     }
@@ -128,8 +135,8 @@ export async function PATCH(
 /**
  * DELETE /api/order-items/[id]
  *
- * Removes an item from an order.
- * Order must stay in 'open' status.
+ * Removes a pending item from an order.
+ * Sent or ready positions stay immutable to preserve the kitchen history.
  * DB trigger recalculates order total automatically.
  */
 export async function DELETE(
@@ -146,7 +153,7 @@ export async function DELETE(
 
     const { data: orderItem, error: fetchErr } = await supabase
       .from('order_items')
-      .select('id, order_id, order:orders(id, shop_id, waiter_id, status)')
+      .select('id, order_id, status, order:orders(id, shop_id, waiter_id, status)')
       .eq('id', id)
       .single()
 
@@ -158,9 +165,16 @@ export async function DELETE(
       id: string; shop_id: string; waiter_id: string; status: string
     }
 
-    if (order.status !== 'open') {
+    if (['paid', 'cancelled'].includes(order.status)) {
       return NextResponse.json(
         err('ORDER_NOT_EDITABLE', `Cannot remove items from an order with status '${order.status}'`),
+        { status: 422 },
+      )
+    }
+
+    if (orderItem.status !== 'pending') {
+      return NextResponse.json(
+        err('ITEM_NOT_EDITABLE', 'Only pending items can be removed before they are sent to the kitchen'),
         { status: 422 },
       )
     }

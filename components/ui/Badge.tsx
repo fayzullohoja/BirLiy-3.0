@@ -50,8 +50,8 @@ export default function Badge({ variant = 'default', children, className, dot }:
 
 // ─── Table Status Badge ───────────────────────────────────────────────────────
 
-import type { TableStatus, OrderStatus } from '@/lib/types'
-import { TABLE_STATUS_LABELS, ORDER_STATUS_LABELS } from '@/lib/utils'
+import type { TableStatus, OrderStatus, OrderItemStatus } from '@/lib/types'
+import { TABLE_STATUS_LABELS, ORDER_STATUS_LABELS, ORDER_ITEM_STATUS_LABELS } from '@/lib/utils'
 
 const TABLE_STATUS_VARIANT: Record<TableStatus, BadgeVariant> = {
   free:           'success',
@@ -68,6 +68,12 @@ const ORDER_STATUS_VARIANT: Record<OrderStatus, BadgeVariant> = {
   cancelled:  'danger',
 }
 
+const ORDER_ITEM_STATUS_VARIANT: Record<OrderItemStatus, BadgeVariant> = {
+  pending:    'neutral',
+  in_kitchen: 'warning',
+  ready:      'success',
+}
+
 export function TableStatusBadge({ status }: { status: TableStatus }) {
   return (
     <Badge variant={TABLE_STATUS_VARIANT[status]} dot>
@@ -80,6 +86,14 @@ export function OrderStatusBadge({ status }: { status: OrderStatus }) {
   return (
     <Badge variant={ORDER_STATUS_VARIANT[status]} dot>
       {ORDER_STATUS_LABELS[status]}
+    </Badge>
+  )
+}
+
+export function OrderItemStatusBadge({ status }: { status: OrderItemStatus }) {
+  return (
+    <Badge variant={ORDER_ITEM_STATUS_VARIANT[status]} dot>
+      {ORDER_ITEM_STATUS_LABELS[status]}
     </Badge>
   )
 }

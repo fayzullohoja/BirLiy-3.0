@@ -28,7 +28,7 @@ export async function GET(req: NextRequest) {
       table:restaurant_tables (id, name, number, status),
       waiter:users         (id, name, username),
       items:order_items    (
-        id, quantity, unit_price, notes,
+        id, quantity, unit_price, status, notes, sent_to_kitchen_at, ready_at,
         menu_item:menu_items (id, name, price)
       )
     `)
@@ -174,6 +174,7 @@ export async function POST(req: NextRequest) {
       menu_item_id: item.menu_item_id,
       quantity:     item.quantity,
       unit_price:   priceMap[item.menu_item_id],
+      status:       'pending' as const,
       notes:        item.notes ?? null,
     }))
 
@@ -194,7 +195,7 @@ export async function POST(req: NextRequest) {
         table:restaurant_tables (id, name, number, status),
         waiter:users (id, name),
         items:order_items (
-          id, quantity, unit_price, notes,
+          id, quantity, unit_price, status, notes, sent_to_kitchen_at, ready_at,
           menu_item:menu_items (id, name, price)
         )
       `)

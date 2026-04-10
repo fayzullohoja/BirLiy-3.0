@@ -71,34 +71,79 @@ $$;
 
 -- ─── Order total recalculation ────────────────────────────────────────────────
 
--- Recalculates total_amount from order_items.
--- Called via trigger after item insert/update/delete.
-CREATE OR REPLACE FUNCTION public.recalc_order_total()
+-- Recalculates total_amount and derives the aggregate order status from
+-- the statuses of its order_items. This keeps one active order per table
+-- while still allowing multiple "waves" of kitchen sends.
+CREATE OR REPLACE FUNCTION public.recalc_order_snapshot()
 RETURNS TRIGGER
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
+DECLARE
+  v_order_id         UUID;
+  v_current_status   public.order_status;
+  v_has_pending      BOOLEAN;
+  v_has_in_kitchen   BOOLEAN;
+  v_has_ready        BOOLEAN;
+  v_total_amount     INTEGER;
+  v_next_status      public.order_status;
 BEGIN
+  v_order_id := COALESCE(NEW.order_id, OLD.order_id);
+
+  SELECT status
+  INTO v_current_status
+  FROM public.orders
+  WHERE id = v_order_id;
+
+  IF v_current_status IS NULL THEN
+    RETURN NEW;
+  END IF;
+
+  SELECT
+    COALESCE(SUM(quantity * unit_price), 0),
+    BOOL_OR(status = 'pending'),
+    BOOL_OR(status = 'in_kitchen'),
+    BOOL_OR(status = 'ready')
+  INTO
+    v_total_amount,
+    v_has_pending,
+    v_has_in_kitchen,
+    v_has_ready
+  FROM public.order_items
+  WHERE order_id = v_order_id;
+
+  IF v_current_status IN ('paid', 'cancelled') THEN
+    UPDATE public.orders
+    SET total_amount = v_total_amount
+    WHERE id = v_order_id;
+    RETURN NEW;
+  END IF;
+
+  v_next_status := CASE
+    WHEN v_has_in_kitchen THEN 'in_kitchen'
+    WHEN v_has_pending THEN 'open'
+    WHEN v_has_ready THEN 'ready'
+    ELSE 'open'
+  END;
+
   UPDATE public.orders
-  SET total_amount = (
-    SELECT COALESCE(SUM(quantity * unit_price), 0)
-    FROM public.order_items
-    WHERE order_id = COALESCE(NEW.order_id, OLD.order_id)
-  )
-  WHERE id = COALESCE(NEW.order_id, OLD.order_id);
+  SET total_amount = v_total_amount,
+      status = v_next_status
+  WHERE id = v_order_id;
+
   RETURN NEW;
 END;
 $$;
 
-CREATE TRIGGER trg_recalc_order_total_insert
+CREATE TRIGGER trg_recalc_order_snapshot_insert
   AFTER INSERT ON public.order_items
-  FOR EACH ROW EXECUTE FUNCTION public.recalc_order_total();
+  FOR EACH ROW EXECUTE FUNCTION public.recalc_order_snapshot();
 
-CREATE TRIGGER trg_recalc_order_total_update
-  AFTER UPDATE OF quantity, unit_price ON public.order_items
-  FOR EACH ROW EXECUTE FUNCTION public.recalc_order_total();
+CREATE TRIGGER trg_recalc_order_snapshot_update
+  AFTER UPDATE OF quantity, unit_price, status ON public.order_items
+  FOR EACH ROW EXECUTE FUNCTION public.recalc_order_snapshot();
 
-CREATE TRIGGER trg_recalc_order_total_delete
+CREATE TRIGGER trg_recalc_order_snapshot_delete
   AFTER DELETE ON public.order_items
-  FOR EACH ROW EXECUTE FUNCTION public.recalc_order_total();
+  FOR EACH ROW EXECUTE FUNCTION public.recalc_order_snapshot();
 
 -- ─── Table status sync ────────────────────────────────────────────────────────
 

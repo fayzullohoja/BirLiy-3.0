@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
-import { OrderStatusBadge } from '@/components/ui/Badge'
+import { OrderItemStatusBadge, OrderStatusBadge } from '@/components/ui/Badge'
 import { formatUZS, formatTime, formatDate, PAYMENT_TYPE_LABELS, ORDER_STATUS_LABELS } from '@/lib/utils'
 import type { Order } from '@/lib/types'
 
@@ -96,8 +96,14 @@ export default function OwnerOrderDetailPage() {
               {items.map((item) => (
                 <li key={item.id} className="flex items-center justify-between px-4 py-3 gap-3">
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-ink">{item.menu_item?.name ?? 'Позиция'}</p>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="text-sm font-medium text-ink">{item.menu_item?.name ?? 'Позиция'}</p>
+                      <OrderItemStatusBadge status={item.status} />
+                    </div>
                     <p className="text-xs text-ink-muted">{formatUZS(item.unit_price)} × {item.quantity}</p>
+                    {item.notes && (
+                      <p className="text-xs text-ink-secondary mt-1">{item.notes}</p>
+                    )}
                   </div>
                   <span className="text-sm font-semibold text-ink shrink-0">
                     {formatUZS(item.unit_price * item.quantity)}

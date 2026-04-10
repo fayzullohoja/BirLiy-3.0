@@ -32,7 +32,7 @@ export async function GET(
         table:restaurant_tables (id, number, name, capacity, status),
         waiter:users (id, name, username),
         items:order_items (
-          id, quantity, unit_price, notes,
+          id, quantity, unit_price, status, notes, sent_to_kitchen_at, ready_at,
           menu_item:menu_items (id, name, price)
         )
       `)
@@ -55,32 +55,14 @@ export async function GET(
   }
 }
 
-/** Allowed status transitions */
-const TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  open:       ['in_kitchen', 'paid', 'cancelled'],
-  in_kitchen: ['ready', 'paid', 'cancelled'],
-  ready:      ['paid', 'cancelled'],
-  paid:       [],
-  cancelled:  [],
-}
-
-const WAITER_TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  open:       ['in_kitchen', 'paid', 'cancelled'],
-  in_kitchen: [],
-  ready:      ['paid'],
-  paid:       [],
-  cancelled:  [],
-}
-
 /**
  * PATCH /api/orders/[id]
  *
- * Transitions order status and optionally sets payment_type.
- * - Validates allowed status transitions.
- * - DB trigger handles table status sync automatically.
- * - Waiters can only update their own orders and cannot interfere once the
- *   order is already on the kitchen queue.
- * - Kitchen can only move orders from in_kitchen to ready.
+ * Performs business actions on an active order.
+ * - 'in_kitchen' sends only pending items to the kitchen.
+ * - 'ready' marks the currently cooking batch as ready.
+ * - 'paid' closes the full order only when no pending/in_kitchen items remain.
+ * - 'cancelled' closes the order; waiters can only do this while every item is still pending.
  *
  * Body: { status: OrderStatus, payment_type?: PaymentType }
  */
@@ -121,7 +103,7 @@ export async function PATCH(
 
     const supabase = createServiceClient()
 
-    // Load current order to check transition + authorization
+    // Load current order to check authorization and current state
     const { data: order, error: fetchErr } = await supabase
       .from('orders')
       .select('id, shop_id, waiter_id, status')
@@ -138,78 +120,229 @@ export async function PATCH(
       return NextResponse.json(err('FORBIDDEN', 'No access to this shop'), { status: 403 })
     }
 
-    const currentStatus = order.status as OrderStatus
-    const allowed       = TRANSITIONS[currentStatus]
-    if (!allowed.includes(status)) {
+    if (order.status === 'paid' || order.status === 'cancelled') {
       return NextResponse.json(
-        err(
-          'INVALID_TRANSITION',
-          `Cannot transition from '${currentStatus}' to '${status}'. Allowed: ${allowed.join(', ') || 'none'}`,
-        ),
+        err('ORDER_CLOSED', `Cannot change an order with status '${order.status}'`),
         { status: 422 },
       )
     }
 
-    if (shopRole === 'kitchen') {
+    if (shopRole === 'waiter' && order.waiter_id !== userId) {
+      return NextResponse.json(
+        err('FORBIDDEN', 'Waiters can only update their own orders'),
+        { status: 403 },
+      )
+    }
+
+    const { data: itemRows, error: itemsErr } = await supabase
+      .from('order_items')
+      .select('id, status')
+      .eq('order_id', id)
+
+    if (itemsErr) {
+      console.error('[orders PATCH] load items:', itemsErr)
+      return NextResponse.json(err('DB_ERROR', 'Failed to inspect order items'), { status: 500 })
+    }
+
+    const items = itemRows ?? []
+    const hasPending = items.some((item) => item.status === 'pending')
+    const hasInKitchen = items.some((item) => item.status === 'in_kitchen')
+    const hasReady = items.some((item) => item.status === 'ready')
+    const allPending = items.length > 0 && items.every((item) => item.status === 'pending')
+
+    if (status === 'open') {
+      return NextResponse.json(
+        err('INVALID_TRANSITION', 'Order status is recalculated automatically from item statuses'),
+        { status: 422 },
+      )
+    }
+
+    if (status === 'in_kitchen') {
       if (payment_type) {
         return NextResponse.json(
-          err('FORBIDDEN', 'Kitchen staff cannot set payment type'),
+          err('FORBIDDEN', 'Payment type cannot be set when sending items to the kitchen'),
           { status: 403 },
         )
       }
 
-      if (currentStatus !== 'in_kitchen' || status !== 'ready') {
+      if (shopRole === 'kitchen') {
         return NextResponse.json(
-          err('FORBIDDEN', 'Kitchen staff can only mark in_kitchen orders as ready'),
+          err('FORBIDDEN', 'Kitchen staff cannot send items to the kitchen queue'),
           { status: 403 },
         )
       }
+
+      if (!hasPending) {
+        return NextResponse.json(
+          err('NO_PENDING_ITEMS', 'There are no new items left to send to the kitchen'),
+          { status: 422 },
+        )
+      }
+
+      const { error: sendErr } = await supabase
+        .from('order_items')
+        .update({
+          status: 'in_kitchen',
+          sent_to_kitchen_at: new Date().toISOString(),
+          ready_at: null,
+        })
+        .eq('order_id', id)
+        .eq('status', 'pending')
+
+      if (sendErr) {
+        console.error('[orders PATCH] send to kitchen:', sendErr)
+        return NextResponse.json(err('DB_ERROR', 'Failed to send pending items to the kitchen'), { status: 500 })
+      }
+
+      const updated = await loadFullOrder(supabase, id)
+      return NextResponse.json(ok<Order>(updated))
     }
 
-    // Waiters can only transition their own orders and cannot interfere while the
-    // order is already being cooked.
-    if (shopRole === 'waiter') {
-      if (order.waiter_id !== userId) {
+    if (status === 'ready') {
+      if (payment_type) {
         return NextResponse.json(
-          err('FORBIDDEN', 'Waiters can only update their own orders'),
+          err('FORBIDDEN', 'Payment type cannot be set when marking items ready'),
           { status: 403 },
         )
       }
 
-      const waiterAllowed = WAITER_TRANSITIONS[currentStatus]
-      if (!waiterAllowed.includes(status)) {
+      if (!['owner', 'kitchen'].includes(shopRole)) {
         return NextResponse.json(
-          err(
-            'FORBIDDEN',
-            currentStatus === 'in_kitchen'
-              ? 'Waiters cannot change an order while it is on the kitchen queue'
-              : `Waiters cannot transition '${currentStatus}' orders to '${status}'`,
-          ),
+          err('FORBIDDEN', 'Only kitchen staff or owners can mark kitchen items as ready'),
           { status: 403 },
         )
       }
+
+      if (!hasInKitchen) {
+        return NextResponse.json(
+          err('NO_KITCHEN_ITEMS', 'There are no items currently on the kitchen queue'),
+          { status: 422 },
+        )
+      }
+
+      const { error: readyErr } = await supabase
+        .from('order_items')
+        .update({
+          status: 'ready',
+          ready_at: new Date().toISOString(),
+        })
+        .eq('order_id', id)
+        .eq('status', 'in_kitchen')
+
+      if (readyErr) {
+        console.error('[orders PATCH] mark ready:', readyErr)
+        return NextResponse.json(err('DB_ERROR', 'Failed to update kitchen items'), { status: 500 })
+      }
+
+      const updated = await loadFullOrder(supabase, id)
+      return NextResponse.json(ok<Order>(updated))
     }
 
-    // Perform update; DB trigger handles table status sync
-    const updates: Record<string, unknown> = { status }
-    if (payment_type)            updates.payment_type = payment_type
-    if (status === 'cancelled')  updates.payment_type = null
+    if (status === 'paid') {
+      if (!payment_type) {
+        return NextResponse.json(
+          err('PAYMENT_TYPE_REQUIRED', 'payment_type is required when marking an order as paid'),
+          { status: 400 },
+        )
+      }
 
-    const { data: updated, error: updateErr } = await supabase
-      .from('orders')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single()
+      if (shopRole === 'kitchen') {
+        return NextResponse.json(
+          err('FORBIDDEN', 'Kitchen staff cannot close orders'),
+          { status: 403 },
+        )
+      }
 
-    if (updateErr) {
-      console.error('[orders PATCH]', updateErr)
-      return NextResponse.json(err('DB_ERROR', 'Failed to update order'), { status: 500 })
+      if (hasPending || hasInKitchen || !hasReady) {
+        return NextResponse.json(
+          err('ORDER_NOT_READY_FOR_PAYMENT', 'You can accept payment only after all items are cooked and no new items are pending'),
+          { status: 422 },
+        )
+      }
+
+      const { data: updated, error: updateErr } = await supabase
+        .from('orders')
+        .update({ status: 'paid', payment_type })
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (updateErr || !updated) {
+        console.error('[orders PATCH] pay order:', updateErr)
+        return NextResponse.json(err('DB_ERROR', 'Failed to close the order'), { status: 500 })
+      }
+
+      return NextResponse.json(ok<Order>(updated))
     }
 
-    return NextResponse.json(ok<Order>(updated))
+    if (status === 'cancelled') {
+      if (payment_type) {
+        return NextResponse.json(
+          err('FORBIDDEN', 'Payment type cannot be set when cancelling an order'),
+          { status: 403 },
+        )
+      }
+
+      if (shopRole === 'kitchen') {
+        return NextResponse.json(
+          err('FORBIDDEN', 'Kitchen staff cannot cancel orders'),
+          { status: 403 },
+        )
+      }
+
+      if (shopRole === 'waiter' && !allPending) {
+        return NextResponse.json(
+          err('FORBIDDEN', 'Waiters can cancel an order only before any items are sent to the kitchen'),
+          { status: 403 },
+        )
+      }
+
+      const { data: updated, error: updateErr } = await supabase
+        .from('orders')
+        .update({ status: 'cancelled', payment_type: null })
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (updateErr || !updated) {
+        console.error('[orders PATCH] cancel order:', updateErr)
+        return NextResponse.json(err('DB_ERROR', 'Failed to cancel the order'), { status: 500 })
+      }
+
+      return NextResponse.json(ok<Order>(updated))
+    }
+
+    return NextResponse.json(
+      err('INVALID_TRANSITION', `Unsupported order action '${status}'`),
+      { status: 422 },
+    )
   } catch (e) {
     console.error('[orders PATCH] unexpected:', e)
     return NextResponse.json(err('INTERNAL_ERROR', 'Internal server error'), { status: 500 })
   }
+}
+
+async function loadFullOrder(
+  supabase: ReturnType<typeof createServiceClient>,
+  orderId: string,
+) {
+  const { data, error } = await supabase
+    .from('orders')
+    .select(`
+      *,
+      table:restaurant_tables (id, number, name, capacity, status),
+      waiter:users (id, name, username),
+      items:order_items (
+        *,
+        menu_item:menu_items (id, name, price)
+      )
+    `)
+    .eq('id', orderId)
+    .single()
+
+  if (error || !data) {
+    throw error ?? new Error(`Order ${orderId} not found after update`)
+  }
+
+  return data as Order
 }
