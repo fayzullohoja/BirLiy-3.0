@@ -304,4 +304,4 @@ supabase/
 | 4    | Owner panel: аналитика, заказы, столы, меню, бронирования, персонал         |
 | 5    | Super admin: платформа, заведения, пользователи, подписки                   |
 | 6    | Полировка: Toast, FormField, ConfirmSheet, deployment config, документация  |
->>>>>>> e574d42 (Initial project import)
+| 7    | Kitchen role: очередь кухни, роль kitchen в admin UI, миграции БД           |

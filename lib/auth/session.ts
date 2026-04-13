@@ -51,10 +51,11 @@ export interface SignSessionOptions {
   shopIds:         string[]
   primaryShopId:   string | null
   subscriptionOk:  boolean
+  ttlSec?:         number
 }
 
 export async function signSession(opts: SignSessionOptions): Promise<string> {
-  const { userId, appRole, shopIds, primaryShopId, subscriptionOk } = opts
+  const { userId, appRole, shopIds, primaryShopId, subscriptionOk, ttlSec } = opts
 
   return new SignJWT({
     app_role:        appRole,
@@ -66,7 +67,7 @@ export async function signSession(opts: SignSessionOptions): Promise<string> {
     .setSubject(userId)
     .setAudience('authenticated')
     .setIssuedAt()
-    .setExpirationTime(`${SESSION_TTL_SEC}s`)
+    .setExpirationTime(`${ttlSec ?? SESSION_TTL_SEC}s`)
     .sign(getSecret())
 }
 

@@ -32,6 +32,19 @@ interface OrderItemSummary {
   readyItems: number
 }
 
+function getOrderActionErrorMessage(
+  response: Response,
+  payload: { error?: { message?: string } } | null,
+  fallback: string,
+) {
+  return (
+    payload?.error?.message
+    ?? (response.status === 402
+      ? 'Подписка заведения неактивна. Продлите её и попробуйте снова.'
+      : fallback)
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function TableDetailPage() {
@@ -127,56 +140,90 @@ export default function TableDetailPage() {
       return
     }
     setAction(true)
-    const res = await fetch(`/api/order-items/${item.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ quantity: newQty }),
-    }).then(r => r.json())
-    setAction(false)
-    if (res.error) {
-      toast.error(res.error.message)
-      return
+    try {
+      const response = await fetch(`/api/order-items/${item.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quantity: newQty }),
+      })
+      const res = await response.json().catch(() => null)
+
+      if (!response.ok) {
+        toast.error(getOrderActionErrorMessage(response, res, 'Не удалось обновить позицию'))
+        return
+      }
+
+      if (!res || res.error) {
+        toast.error(res?.error?.message ?? 'Не удалось обновить позицию')
+        return
+      }
+
+      setData(prev => prev ? { ...prev, order: res.data } : prev)
+    } catch (e) {
+      console.error('[adjustQty]', e)
+      toast.error('Не удалось обновить позицию')
+    } finally {
+      setAction(false)
     }
-    setData(prev => prev ? { ...prev, order: res.data } : prev)
   }
 
   // ── Delete item ─────────────────────────────────────────────────────────────
   async function deleteItem(item: OrderItem) {
     setAction(true)
-    const res = await fetch(`/api/order-items/${item.id}`, { method: 'DELETE' })
-    setAction(false)
-    if (!res.ok) {
-      const json = await res.json().catch(() => null)
-      toast.error(json?.error?.message ?? 'Не удалось удалить позицию')
-      return
+    try {
+      const response = await fetch(`/api/order-items/${item.id}`, { method: 'DELETE' })
+      if (!response.ok) {
+        const json = await response.json().catch(() => null)
+        toast.error(getOrderActionErrorMessage(response, json, 'Не удалось удалить позицию'))
+        return
+      }
+
+      await fetchData('refresh')
+    } catch (e) {
+      console.error('[deleteItem]', e)
+      toast.error('Не удалось удалить позицию')
+    } finally {
+      setAction(false)
     }
-    await fetchData('refresh')
   }
 
   // ── Status transition ───────────────────────────────────────────────────────
   async function transitionOrder(status: string, paymentType?: PaymentType) {
     if (!data?.order) return
     setAction(true)
-    const res = await fetch(`/api/orders/${data.order.id}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status, ...(paymentType ? { payment_type: paymentType } : {}) }),
-    }).then(r => r.json())
-    setAction(false)
+    try {
+      const response = await fetch(`/api/orders/${data.order.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, ...(paymentType ? { payment_type: paymentType } : {}) }),
+      })
+      const res = await response.json().catch(() => null)
 
-    if (res.error) {
-      toast.error(res.error.message)
-      return
-    }
+      if (!response.ok) {
+        const message = getOrderActionErrorMessage(response, res, 'Не удалось обновить заказ')
+        toast.error(message)
+        return
+      }
 
-    if (SUCCESS_MESSAGES[status as keyof typeof SUCCESS_MESSAGES]) {
-      toast.success(SUCCESS_MESSAGES[status as keyof typeof SUCCESS_MESSAGES]!)
-    }
+      if (!res || res.error) {
+        toast.error(res?.error?.message ?? 'Не удалось обновить заказ')
+        return
+      }
 
-    if (status === 'paid' || status === 'cancelled') {
-      router.push('/waiter')
-    } else {
-      await fetchData('refresh')
+      if (SUCCESS_MESSAGES[status as keyof typeof SUCCESS_MESSAGES]) {
+        toast.success(SUCCESS_MESSAGES[status as keyof typeof SUCCESS_MESSAGES]!)
+      }
+
+      if (status === 'paid' || status === 'cancelled') {
+        router.push('/waiter')
+      } else {
+        await fetchData('refresh')
+      }
+    } catch (e) {
+      console.error('[transitionOrder]', e)
+      toast.error('Не удалось обновить заказ')
+    } finally {
+      setAction(false)
     }
   }
 

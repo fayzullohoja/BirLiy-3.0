@@ -1,21 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { requireSuperAdmin } from '@/lib/auth/apiGuard'
+import { requireShopAdminAccess, requireSuperAdmin } from '@/lib/auth/apiGuard'
 import { err, ok } from '@/lib/utils'
 
 /**
  * GET /api/admin/shops/[id]
  * Single shop detail: shop fields, subscription, staff list.
- * Requires: super_admin.
+ * Requires: super_admin or owner of this shop.
  */
 export async function GET(
   _req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const guard = await requireSuperAdmin()
-  if (!guard.ok) return guard.response
-
   const { id } = await params
+  const guard = await requireShopAdminAccess(id)
+  if (!guard.ok) return guard.response
   const supabase = createServiceClient()
 
   const { data, error } = await supabase
@@ -45,16 +44,15 @@ export async function GET(
 /**
  * PATCH /api/admin/shops/[id]
  * Update shop name, address, phone, or is_active.
- * Requires: super_admin.
+ * Requires: super_admin or owner of this shop.
  */
 export async function PATCH(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const guard = await requireSuperAdmin()
-  if (!guard.ok) return guard.response
-
   const { id } = await params
+  const guard = await requireShopAdminAccess(id)
+  if (!guard.ok) return guard.response
   let body: { name?: string; address?: string; phone?: string; is_active?: boolean }
   try { body = await req.json() } catch { body = {} }
 
@@ -62,7 +60,9 @@ export async function PATCH(
   if (body.name    !== undefined) patch.name      = body.name.trim()
   if (body.address !== undefined) patch.address   = body.address || null
   if (body.phone   !== undefined) patch.phone     = body.phone || null
-  if (body.is_active !== undefined) patch.is_active = body.is_active
+  if (guard.value.platformRole === 'super_admin' && body.is_active !== undefined) {
+    patch.is_active = body.is_active
+  }
 
   if (Object.keys(patch).length === 0) {
     return NextResponse.json(err('VALIDATION', 'No fields to update'), { status: 400 })

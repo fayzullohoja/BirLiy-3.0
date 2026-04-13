@@ -38,6 +38,8 @@ export async function GET() {
   return NextResponse.json(ok<AuthStatusPayload>({
     user_id:         payload.sub,
     role:            context.appRole,
+    shop_ids:        context.shopAccess.map((entry) => entry.shop_id),
+    shops:           context.shopAccess.map((entry) => ({ id: entry.shop_id, name: entry.shop.name })),
     primary_shop_id: context.primaryShopId,
     shop_name:       primaryShop?.shop.name ?? null,
     expires_at:      subscription?.expires_at ?? null,

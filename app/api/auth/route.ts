@@ -17,7 +17,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { validateTelegramInitData } from '@/lib/telegram/validate'
+import { validateTelegramInitData, validateTelegramWidgetData } from '@/lib/telegram/validate'
 import { createServiceClient } from '@/lib/supabase/server'
 import { signSession, getSessionCookieOptions, SESSION_COOKIE } from '@/lib/auth/session'
 import { getUserContext } from '@/lib/auth/getUser'
@@ -26,6 +26,7 @@ import type { AuthResponse, UserRole } from '@/lib/types'
 
 const IS_DEV = process.env.NODE_ENV === 'development'
 const DEV_DEMO_SHOP_ID = '00000000-0000-0000-0000-000000000001'
+const DASHBOARD_SESSION_TTL_SEC = 60 * 60 * 24 * 7
 
 export async function POST(req: NextRequest) {
   try {
@@ -34,6 +35,33 @@ export async function POST(req: NextRequest) {
     // ── Dev bypass ──────────────────────────────────────────────────────────
     if (IS_DEV && body.dev_role) {
       return handleDevAuth(body.dev_role, body.dev_telegram_id ?? 99999999)
+    }
+
+    // ── Telegram Login Widget (dashboard web) ──────────────────────────────
+    if (body.tg_widget) {
+      const botToken = process.env.TELEGRAM_BOT_TOKEN
+      if (!botToken) {
+        console.error('[auth] TELEGRAM_BOT_TOKEN not configured')
+        return NextResponse.json(err('CONFIG_ERROR', 'Server misconfigured'), { status: 500 })
+      }
+
+      const { valid, data: widgetData } = validateTelegramWidgetData(body.tg_widget, botToken)
+      if (!valid || !widgetData) {
+        return NextResponse.json(err('INVALID_WIDGET_DATA', 'Telegram Widget authentication failed'), { status: 401 })
+      }
+
+      const fullName = [widgetData.first_name, widgetData.last_name].filter(Boolean).join(' ').trim()
+      const email = `t_${widgetData.id}@birliy.app`
+
+      return await upsertUserAndRespond(
+        {
+          telegramId: widgetData.id,
+          fullName,
+          username: widgetData.username,
+          email,
+        },
+        { maxAge: DASHBOARD_SESSION_TTL_SEC },
+      )
     }
 
     // ── Validate Telegram initData ──────────────────────────────────────────
@@ -71,7 +99,7 @@ async function upsertUserAndRespond(opts: {
   fullName:   string
   username?:  string
   email:      string
-}) {
+}, sessionOpts: { maxAge?: number } = {}) {
   const { telegramId, fullName, username, email } = opts
   const adminClient = createServiceClient()
 
@@ -150,6 +178,7 @@ async function upsertUserAndRespond(opts: {
     shopIds,
     primaryShopId:  context.primaryShopId,
     subscriptionOk: context.subscriptionOk,
+    ttlSec:         sessionOpts.maxAge,
   })
 
   // 6. Set cookie + return response
@@ -162,7 +191,7 @@ async function upsertUserAndRespond(opts: {
   }
 
   const response = NextResponse.json(ok<AuthResponse>(payload))
-  response.cookies.set(SESSION_COOKIE, sessionToken, getSessionCookieOptions())
+  response.cookies.set(SESSION_COOKIE, sessionToken, getSessionCookieOptions({ maxAge: sessionOpts.maxAge }))
   return response
 }
 

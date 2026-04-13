@@ -18,6 +18,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { verifySession, SESSION_COOKIE } from '@/lib/auth/session'
+import { err } from '@/lib/utils'
 import type { UserRole } from '@/lib/types'
 
 // ─── Route matchers ───────────────────────────────────────────────────────────
@@ -26,10 +27,10 @@ import type { UserRole } from '@/lib/types'
 const PROTECTED_PREFIXES = ['/waiter', '/kitchen', '/owner', '/admin']
 
 /** Routes that are always public (no auth needed) */
-const PUBLIC_PATHS = ['/', '/not-connected', '/subscription-blocked']
+const PUBLIC_PATHS = ['/', '/not-connected', '/subscription-blocked', '/dashboard/login', '/dashboard/not-authorized']
 
 /** API routes that skip session verification (handled internally) */
-const PUBLIC_API_PREFIXES = ['/api/auth', '/_next', '/favicon']
+const PUBLIC_API_PREFIXES = ['/api/auth', '/api/version', '/_next', '/favicon']
 
 /** Role → allowed path prefix */
 const ROLE_HOME: Record<UserRole, string> = {
@@ -58,6 +59,9 @@ export async function middleware(req: NextRequest) {
     // Allow public pages without a session
     if (PUBLIC_PATHS.includes(pathname)) {
       return NextResponse.next()
+    }
+    if (pathname.startsWith('/dashboard')) {
+      return NextResponse.redirect(new URL('/dashboard/login', req.url))
     }
     // Redirect everything else to entry
     return NextResponse.redirect(new URL('/', req.url))
@@ -89,11 +93,37 @@ export async function middleware(req: NextRequest) {
 
   // ── Subscription gate (non-admin, has shops but sub is blocked) ─────────────
 
-  if (role !== 'super_admin' && !subscriptionOk) {
+  if (role !== 'super_admin' && !subscriptionOk && !pathname.startsWith('/dashboard')) {
+    if (pathname.startsWith('/api/')) {
+      return NextResponse.json(
+        err('SUBSCRIPTION_BLOCKED', 'Shop subscription is inactive'),
+        { status: 402 },
+      )
+    }
     if (pathname !== '/subscription-blocked') {
       return NextResponse.redirect(new URL('/subscription-blocked', req.url))
     }
     return NextResponse.next()
+  }
+
+  // ── Dashboard web panel (browser, desktop) ───────────────────────────────
+
+  if (pathname.startsWith('/dashboard')) {
+    if (!['owner', 'super_admin'].includes(role)) {
+      return NextResponse.redirect(new URL(ROLE_HOME[role], req.url))
+    }
+
+    if (pathname === '/dashboard/login' || pathname === '/dashboard/not-authorized') {
+      return NextResponse.redirect(new URL(role === 'super_admin' ? '/dashboard/admin' : '/dashboard/owner', req.url))
+    }
+
+    const requestHeaders = new Headers(req.headers)
+    requestHeaders.set('x-user-id', userId)
+    requestHeaders.set('x-user-role', role)
+    requestHeaders.set('x-shop-ids', JSON.stringify(shopIds))
+    requestHeaders.set('x-primary-shop-id', primaryShopId ?? '')
+
+    return NextResponse.next({ request: { headers: requestHeaders } })
   }
 
   // ── Role-based route protection ─────────────────────────────────────────────

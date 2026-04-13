@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireSuperAdmin } from '@/lib/auth/apiGuard'
 import { err, ok } from '@/lib/utils'
-import type { ShopUserRole, UserRole } from '@/lib/types'
+import { mapAdminUser, type AdminUserRecord } from '@/lib/admin/userUtils'
 
 const VALID_ROLES = ['super_admin', 'owner', 'waiter', 'kitchen'] as const
 const VALID_SHOP_ROLES = ['owner', 'waiter', 'kitchen'] as const
@@ -78,6 +78,7 @@ export async function PATCH(
 
   const supabase = createServiceClient()
   const role = body.role as (typeof VALID_ROLES)[number]
+  const assignmentTimestamp = new Date().toISOString()
 
   const { data: existingUser, error: userError } = await supabase
     .from('users')
@@ -131,29 +132,54 @@ export async function PATCH(
     )
   }
 
-  if (role === 'super_admin' || existingUser.role === 'super_admin') {
-    const { error: updateError } = await supabase
-      .from('users')
-      .update({ role })
-      .eq('id', id)
+  // Always sync users.role so the column stays consistent with shop_users.role
+  const { error: updateError } = await supabase
+    .from('users')
+    .update({ role })
+    .eq('id', id)
 
-    if (updateError) {
-      console.error('[admin/users/[id] PATCH update role]', updateError)
-      return NextResponse.json(err('DB_ERROR', 'Failed to update user role'), { status: 500 })
-    }
+  if (updateError) {
+    console.error('[admin/users/[id] PATCH update role]', updateError)
+    return NextResponse.json(err('DB_ERROR', 'Failed to update user role'), { status: 500 })
   }
 
   if (role !== 'super_admin') {
-    const { error: membershipError } = await supabase
+    const { data: existingMembership, error: membershipFetchError } = await supabase
       .from('shop_users')
-      .upsert(
-        { shop_id: shopId, user_id: id, role: shopRole },
-        { onConflict: 'shop_id,user_id' },
-      )
+      .select('id')
+      .eq('shop_id', shopId)
+      .eq('user_id', id)
+      .maybeSingle()
 
-    if (membershipError) {
-      console.error('[admin/users/[id] PATCH upsert membership]', membershipError)
-      return NextResponse.json(err('DB_ERROR', 'Failed to assign user to shop'), { status: 500 })
+    if (membershipFetchError) {
+      console.error('[admin/users/[id] PATCH fetch membership]', membershipFetchError)
+      return NextResponse.json(err('DB_ERROR', 'Failed to inspect shop membership'), { status: 500 })
+    }
+
+    if (existingMembership?.id) {
+      const { error: membershipUpdateError } = await supabase
+        .from('shop_users')
+        .update({ role: shopRole, created_at: assignmentTimestamp })
+        .eq('id', existingMembership.id)
+
+      if (membershipUpdateError) {
+        console.error('[admin/users/[id] PATCH update membership]', membershipUpdateError)
+        return NextResponse.json(err('DB_ERROR', 'Failed to assign user to shop'), { status: 500 })
+      }
+    } else {
+      const { error: membershipInsertError } = await supabase
+        .from('shop_users')
+        .insert({
+          shop_id: shopId,
+          user_id: id,
+          role: shopRole,
+          created_at: assignmentTimestamp,
+        })
+
+      if (membershipInsertError) {
+        console.error('[admin/users/[id] PATCH insert membership]', membershipInsertError)
+        return NextResponse.json(err('DB_ERROR', 'Failed to assign user to shop'), { status: 500 })
+      }
     }
   }
 
@@ -175,53 +201,4 @@ export async function PATCH(
   }
 
   return NextResponse.json(ok(mapAdminUser(data as AdminUserRecord)))
-}
-
-type AdminShopMembership = {
-  id: string
-  role: ShopUserRole
-  shop_id: string
-  created_at?: string
-  shop: { id: string; name: string; is_active: boolean } | { id: string; name: string; is_active: boolean }[] | null
-}
-
-type AdminUserRecord = {
-  id: string
-  telegram_id: number
-  name: string
-  username: string | null
-  role: UserRole
-  created_at: string
-  updated_at: string
-  shops?: AdminShopMembership[]
-}
-
-function mapAdminUser<T extends AdminUserRecord>(user: T): T {
-  const normalizedShops = normalizeMemberships(user.shops ?? [])
-  const primaryMembership = resolvePrimaryMembership(normalizedShops)
-  const effectiveRole: UserRole =
-    user.role === 'super_admin'
-      ? 'super_admin'
-      : primaryMembership?.role ?? user.role
-
-  return {
-    ...user,
-    role: effectiveRole,
-    shops: normalizedShops,
-  }
-}
-
-function resolvePrimaryMembership(shops: AdminShopMembership[]) {
-  return [...shops].sort((a, b) => {
-    const aTime = a.created_at ? new Date(a.created_at).getTime() : 0
-    const bTime = b.created_at ? new Date(b.created_at).getTime() : 0
-    return aTime - bTime
-  })[0] ?? null
-}
-
-function normalizeMemberships(shops: AdminShopMembership[]) {
-  return shops.map((membership) => ({
-    ...membership,
-    shop: Array.isArray(membership.shop) ? membership.shop[0] ?? null : membership.shop,
-  }))
 }

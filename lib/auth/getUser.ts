@@ -114,7 +114,7 @@ export async function getUserContext(userId: string): Promise<UserContext> {
       return aActive ? -1 : 1
     }
 
-    return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   })
 
   const shopAccess: ShopAccessEntry[] = sortedAccess.map((row) => ({
@@ -130,7 +130,8 @@ export async function getUserContext(userId: string): Promise<UserContext> {
   const hasShopAccess =
     userRes.data.role === 'super_admin' || shopAccess.length > 0
 
-  // Primary shop = first active subscription, otherwise the oldest membership.
+  // Primary shop = most recently assigned active subscription, otherwise the
+  // most recently assigned membership.
   const primaryAccess = shopAccess[0] ?? null
   const subscriptionOk =
     userRes.data.role === 'super_admin' ||

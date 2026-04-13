@@ -37,7 +37,7 @@ export async function refreshTelegramSessionAndRedirect() {
   window.location.replace(resolveAuthDestination(auth))
 }
 
-export async function signOutCurrentSession() {
+export async function signOutCurrentSession(opts: { redirectTo?: string } = {}) {
   await fetch('/api/auth/logout', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -45,15 +45,17 @@ export async function signOutCurrentSession() {
 
   if (typeof window === 'undefined') return
 
+  const redirectTo = opts.redirectTo ?? '/'
+
   if (isInTelegram()) {
     getTelegramWebApp()?.close()
     window.setTimeout(() => {
-      window.location.replace('/')
+      window.location.replace(redirectTo)
     }, 150)
     return
   }
 
-  window.location.replace('/')
+  window.location.replace(redirectTo)
 }
 
 export async function loadAuthStatus(): Promise<AuthStatusPayload> {

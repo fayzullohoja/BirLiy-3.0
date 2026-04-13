@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { requireSuperAdmin } from '@/lib/auth/apiGuard'
+import { requireShopAdminAccess } from '@/lib/auth/apiGuard'
 import { err, ok } from '@/lib/utils'
 
 /**
@@ -8,16 +8,15 @@ import { err, ok } from '@/lib/utils'
  * Assign a user to a shop with a given role (owner, waiter or kitchen).
  * If the user already belongs to this shop, updates their role.
  * Body: { user_id, role }
- * Requires: super_admin.
+ * Requires: super_admin or owner of this shop.
  */
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const guard = await requireSuperAdmin()
-  if (!guard.ok) return guard.response
-
   const { id: shopId } = await params
+  const guard = await requireShopAdminAccess(shopId)
+  if (!guard.ok) return guard.response
   let body: { user_id?: string; role?: string }
   try { body = await req.json() } catch { body = {} }
 
@@ -30,6 +29,7 @@ export async function POST(
   }
 
   const supabase = createServiceClient()
+  const assignmentTimestamp = new Date().toISOString()
 
   // Verify user exists
   const { data: user, error: userErr } = await supabase
@@ -42,18 +42,43 @@ export async function POST(
     return NextResponse.json(err('NOT_FOUND', 'User not found'), { status: 404 })
   }
 
-  // Upsert membership
-  const { data, error } = await supabase
+  const { data: existingMembership, error: membershipFetchError } = await supabase
     .from('shop_users')
-    .upsert(
-      { shop_id: shopId, user_id, role },
-      { onConflict: 'shop_id,user_id' },
-    )
-    .select(`
-      id, shop_id, user_id, role, created_at,
-      user:users (id, name, username, telegram_id, role)
-    `)
-    .single()
+    .select('id')
+    .eq('shop_id', shopId)
+    .eq('user_id', user_id)
+    .maybeSingle()
+
+  if (membershipFetchError) {
+    console.error('[admin/shops/[id]/members POST fetch membership]', membershipFetchError)
+    return NextResponse.json(err('DB_ERROR', 'Failed to inspect shop membership'), { status: 500 })
+  }
+
+  const membershipMutation = existingMembership?.id
+    ? await supabase
+        .from('shop_users')
+        .update({ role, created_at: assignmentTimestamp })
+        .eq('id', existingMembership.id)
+        .select(`
+          id, shop_id, user_id, role, created_at,
+          user:users (id, name, username, telegram_id, role)
+        `)
+        .single()
+    : await supabase
+        .from('shop_users')
+        .insert({
+          shop_id: shopId,
+          user_id,
+          role,
+          created_at: assignmentTimestamp,
+        })
+        .select(`
+          id, shop_id, user_id, role, created_at,
+          user:users (id, name, username, telegram_id, role)
+        `)
+        .single()
+
+  const { data, error } = membershipMutation
 
   if (error) {
     console.error('[admin/shops/[id]/members POST]', error)
@@ -66,19 +91,25 @@ export async function POST(
 /**
  * DELETE /api/admin/shops/[id]/members?user_id=xxx
  * Remove a user from the shop.
- * Requires: super_admin.
+ * Requires: super_admin or owner of this shop.
  */
 export async function DELETE(
   req: NextRequest,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const guard = await requireSuperAdmin()
-  if (!guard.ok) return guard.response
-
   const { id: shopId } = await params
+  const guard = await requireShopAdminAccess(shopId)
+  if (!guard.ok) return guard.response
   const userId = req.nextUrl.searchParams.get('user_id')
   if (!userId) {
     return NextResponse.json(err('VALIDATION', 'user_id is required'), { status: 400 })
+  }
+
+  if (guard.value.platformRole !== 'super_admin' && userId === guard.value.userId) {
+    return NextResponse.json(
+      err('FORBIDDEN', 'You cannot remove yourself from the shop'),
+      { status: 403 },
+    )
   }
 
   const supabase = createServiceClient()

@@ -160,12 +160,15 @@ export interface TelegramInitData {
 
 /** Payload stored in the Supabase-compatible JWT session cookie */
 export interface SessionPayload {
-  sub:      string     // auth.users.id (= public.users.id)
-  role:     'authenticated'
-  aud:      'authenticated'
-  app_role: UserRole
-  iat:      number
-  exp:      number
+  sub:             string     // auth.users.id (= public.users.id)
+  role:            'authenticated'
+  aud:             'authenticated'
+  app_role:        UserRole
+  shop_ids:        string[]
+  primary_shop_id: string | null
+  subscription_ok: boolean
+  iat:             number
+  exp:             number
 }
 
 /** Decoded user info available to server-side code via headers or cookie */
@@ -221,9 +224,59 @@ export interface AuthResponse {
 export interface AuthStatusPayload {
   user_id:         string
   role:            UserRole
+  shop_ids:        string[]
+  shops:           Array<{ id: string; name: string }>
   primary_shop_id: string | null
   shop_name:       string | null
   expires_at:      string | null
-  sub_status:      string | null
+  sub_status:      SubStatus | null
   needs_refresh:   boolean
+}
+
+export interface ExtendedAnalyticsByDay {
+  date:    string
+  revenue: number
+  orders:  number
+}
+
+export interface ExtendedAnalyticsByWaiter {
+  waiter_id:   string
+  waiter_name: string
+  orders:      number
+  revenue:     number
+}
+
+export interface ExtendedAnalyticsTopItem {
+  item_id:  string
+  name:     string
+  quantity: number
+  revenue:  number
+}
+
+export interface ExtendedAnalyticsResponse {
+  period: {
+    revenue:   number
+    orders:    number
+    avg_order: number
+  }
+  by_day:    ExtendedAnalyticsByDay[]
+  by_waiter: ExtendedAnalyticsByWaiter[]
+  top_items: ExtendedAnalyticsTopItem[]
+}
+
+export interface StatsTimelinePoint {
+  date: string
+  plan: SubPlan
+  count: number
+}
+
+export interface StatsTimelineResponse {
+  subscriptions_by_day: StatsTimelinePoint[]
+  totals: {
+    active: number
+    trial: number
+    expired: number
+    suspended: number
+    total: number
+  }
 }

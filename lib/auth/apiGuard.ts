@@ -41,6 +41,10 @@ export interface ShopGuardResult {
   shopRole:  'owner' | 'waiter' | 'kitchen'
 }
 
+export interface ShopAdminGuardResult extends ShopGuardResult {
+  platformRole: RequestUser['role']
+}
+
 /**
  * Verifies the user has access to the given shop.
  * Returns 401 if not authenticated, 403 if no shop access, 400 if shopId missing.
@@ -123,4 +127,39 @@ export async function requireOwnerAccess(
   }
 
   return result
+}
+
+/**
+ * Allows either super_admin or the owner of the given shop.
+ * Useful for owner-facing dashboard screens that reuse admin/shop endpoints.
+ */
+export async function requireShopAdminAccess(
+  shopId: string | null | undefined,
+): Promise<GuardResult<ShopAdminGuardResult>> {
+  const authResult = await requireAuth()
+  if (!authResult.ok) return authResult as GuardResult<ShopAdminGuardResult>
+
+  if (authResult.value.role === 'super_admin') {
+    return {
+      ok: true,
+      value: {
+        userId: authResult.value.userId,
+        shopRole: 'owner',
+        platformRole: authResult.value.role,
+      },
+      response: null,
+    }
+  }
+
+  const ownerResult = await requireOwnerAccess(shopId)
+  if (!ownerResult.ok) return ownerResult as GuardResult<ShopAdminGuardResult>
+
+  return {
+    ok: true,
+    value: {
+      ...ownerResult.value,
+      platformRole: authResult.value.role,
+    },
+    response: null,
+  }
 }
