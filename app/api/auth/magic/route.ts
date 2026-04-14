@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
-import { requireAuth } from '@/lib/auth/apiGuard'
 import { err, ok } from '@/lib/utils'
-import { getUserContext } from '@/lib/auth/getUser'
+import { getSessionUser, getUserContext } from '@/lib/auth/getUser'
 import { signSession } from '@/lib/auth/session'
 
 const MAGIC_TTL_SEC = 60 * 10 // 10 minutes
@@ -19,10 +18,14 @@ const MAGIC_TTL_SEC = 60 * 10 // 10 minutes
  *           → /dashboard/auth validates token, sets session cookie, redirects
  */
 export async function POST() {
-  const authResult = await requireAuth()
-  if (!authResult.ok) return authResult.response
+  // Use getSessionUser (reads cookie directly) — middleware skips header injection
+  // for /api/auth/* routes, so requireAuth() would always return 401 here.
+  const user = await getSessionUser()
+  if (!user) {
+    return NextResponse.json(err('UNAUTHENTICATED', 'Authentication required'), { status: 401 })
+  }
 
-  const { userId, role } = authResult.value
+  const { userId, role } = user
 
   if (!['owner', 'manager', 'super_admin'].includes(role)) {
     return NextResponse.json(
