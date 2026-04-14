@@ -1,7 +1,7 @@
 // ─── Enums / Literal Types ────────────────────────────────────────────────────
 
-export type UserRole      = 'super_admin' | 'owner' | 'waiter' | 'kitchen'
-export type ShopUserRole  = 'owner' | 'waiter' | 'kitchen'
+export type UserRole      = 'super_admin' | 'owner' | 'manager' | 'waiter' | 'kitchen'
+export type ShopUserRole  = 'owner' | 'manager' | 'waiter' | 'kitchen'
 export type TableStatus   = 'free' | 'occupied' | 'reserved' | 'bill_requested'
 export type OrderStatus   = 'open' | 'in_kitchen' | 'ready' | 'paid' | 'cancelled'
 export type OrderItemStatus = 'pending' | 'in_kitchen' | 'ready'
@@ -9,6 +9,7 @@ export type PaymentType   = 'cash' | 'card' | 'payme' | 'click'
 export type BookingStatus = 'confirmed' | 'seated' | 'cancelled' | 'no_show'
 export type SubStatus     = 'trial' | 'active' | 'expired' | 'suspended'
 export type SubPlan       = 'trial' | 'starter' | 'pro'
+export type OwnerApplicationStatus = 'pending' | 'contacted' | 'approved' | 'rejected'
 
 // ─── Core Entities ────────────────────────────────────────────────────────────
 
@@ -136,6 +137,35 @@ export interface TableBooking {
   // Joined
   table?:           Table
   user?:            AppUser
+}
+
+export interface ShopInviteCode {
+  id:         string
+  shop_id:    string
+  role:       ShopUserRole
+  code:       string
+  is_active:  boolean
+  created_by: string | null
+  updated_by: string | null
+  created_at: string
+  updated_at: string
+  shop?:      Shop
+}
+
+export interface OwnerApplication {
+  id:               string
+  telegram_user_id: string | null
+  telegram_id:      number
+  applicant_name:   string
+  restaurant_name:  string
+  phone:            string
+  status:           OwnerApplicationStatus
+  note:             string | null
+  reviewed_by:      string | null
+  created_at:       string
+  updated_at:       string
+  user?:            AppUser | null
+  reviewer?:        AppUser | null
 }
 
 // ─── Auth / Session ───────────────────────────────────────────────────────────

@@ -11,6 +11,7 @@ import {
 import { usePathname, useRouter } from 'next/navigation'
 import { loadAuthStatus } from '@/lib/auth/clientAuth'
 import type { AuthStatusPayload, SubStatus, UserRole } from '@/lib/types'
+import { canAccessOwnerSurface } from '@/lib/roles'
 
 const DASHBOARD_SHOP_STORAGE_KEY = 'dashboard:selected-shop-id'
 const SESSION_REFRESH_MS = 30_000
@@ -52,7 +53,7 @@ interface DashboardSessionProviderProps {
 
 export function DashboardSessionProvider({
   children,
-  allowedRoles = ['owner', 'super_admin'],
+  allowedRoles = ['owner', 'manager', 'super_admin'],
 }: DashboardSessionProviderProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -200,6 +201,6 @@ function resolveRoleFallback(role: UserRole, allowedRoles: readonly UserRole[]) 
 
   if (role === 'waiter') return '/waiter'
   if (role === 'kitchen') return '/kitchen'
-  if (role === 'owner') return '/dashboard/owner'
+  if (canAccessOwnerSurface(role)) return '/dashboard/owner'
   return '/dashboard/admin'
 }

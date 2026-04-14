@@ -11,6 +11,7 @@ import { verifySession } from './session'
 import { SESSION_COOKIE } from './session'
 import { createServiceClient } from '@/lib/supabase/server'
 import type { RequestUser, UserContext, ShopAccessEntry, UserRole } from '@/lib/types'
+import { normalizePlatformRole } from '@/lib/roles'
 
 // ─── Request-level user (set by middleware via headers) ───────────────────────
 
@@ -99,7 +100,7 @@ export async function getUserContext(userId: string): Promise<UserContext> {
 
   const rawAccess = (accessRes.data ?? []) as unknown as Array<{
     shop_id: string
-    role:    'owner' | 'waiter' | 'kitchen'
+    role:    'owner' | 'manager' | 'waiter' | 'kitchen'
     created_at: string
     shop:    (typeof userRes.data) & {
       subscription: { id: string; shop_id: string; status: string; plan: string; expires_at: string; created_at: string; updated_at: string } | null
@@ -141,8 +142,13 @@ export async function getUserContext(userId: string): Promise<UserContext> {
       ? 'super_admin'
       : primaryAccess?.role ?? 'waiter'
 
+  const normalizedUser = {
+    ...userRes.data,
+    role: normalizePlatformRole(userRes.data.role),
+  }
+
   return {
-    user:           userRes.data,
+    user:           normalizedUser,
     shopAccess,
     appRole,
     primaryShopRole: primaryAccess?.role ?? null,
@@ -163,7 +169,7 @@ export async function verifyShopAccess(
   userId: string,
   role:   UserRole,
   shopId: string,
-): Promise<'owner' | 'waiter' | 'kitchen' | null> {
+): Promise<'owner' | 'manager' | 'waiter' | 'kitchen' | null> {
   if (role === 'super_admin') return 'owner' // super_admin treated as owner everywhere
 
   const supabase = createServiceClient()
@@ -174,7 +180,7 @@ export async function verifyShopAccess(
     .eq('shop_id', shopId)
     .single()
 
-  return (data?.role as 'owner' | 'waiter' | 'kitchen' | undefined) ?? null
+  return (data?.role as 'owner' | 'manager' | 'waiter' | 'kitchen' | undefined) ?? null
 }
 
 // ─── AuthError ────────────────────────────────────────────────────────────────

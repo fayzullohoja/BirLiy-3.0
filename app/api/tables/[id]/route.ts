@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { requireAuth, requireOwnerAccess } from '@/lib/auth/apiGuard'
+import { requireAuth, requireManagementAccess } from '@/lib/auth/apiGuard'
 import { verifyShopAccess } from '@/lib/auth/getUser'
 import { err, ok } from '@/lib/utils'
 import type { Table, TableStatus } from '@/lib/types'
+import { isManagementShopRole } from '@/lib/roles'
 
 const VALID_STATUSES: TableStatus[] = ['free', 'occupied', 'reserved', 'bill_requested']
 
@@ -48,7 +49,7 @@ export async function GET(
 /**
  * PATCH /api/tables/[id]
  * Updates table fields or status.
- * Requires: any shop member (for status changes); owner (for structural changes).
+ * Requires: any shop member (for status changes); owner or manager (for structural changes).
  *
  * Body: Partial<{ name, capacity, status }>
  */
@@ -90,8 +91,8 @@ export async function PATCH(
 
     // Structural changes (name, capacity) require owner
     const isStructuralChange = 'name' in body || 'capacity' in body
-    if (isStructuralChange && shopRole !== 'owner') {
-      return NextResponse.json(err('FORBIDDEN', 'Owner required to change table structure'), { status: 403 })
+    if (isStructuralChange && !isManagementShopRole(shopRole)) {
+      return NextResponse.json(err('FORBIDDEN', 'Management access required to change table structure'), { status: 403 })
     }
 
     if (body.status && !VALID_STATUSES.includes(body.status)) {
@@ -123,7 +124,7 @@ export async function PATCH(
 /**
  * DELETE /api/tables/[id]
  * Deletes a table. Blocked if there are open orders.
- * Requires: owner.
+ * Requires: owner or manager.
  */
 export async function DELETE(
   req: NextRequest,
@@ -144,7 +145,7 @@ export async function DELETE(
       return NextResponse.json(err('NOT_FOUND', 'Table not found'), { status: 404 })
     }
 
-    const guard = await requireOwnerAccess(table.shop_id)
+    const guard = await requireManagementAccess(table.shop_id)
     if (!guard.ok) return guard.response
 
     // Guard: no active orders

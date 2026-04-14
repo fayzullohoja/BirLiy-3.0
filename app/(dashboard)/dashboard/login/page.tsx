@@ -42,7 +42,7 @@ export default function DashboardLoginPage() {
           return
         }
 
-        if (role === 'owner') {
+        if (role === 'owner' || role === 'manager') {
           router.replace('/dashboard/owner')
           return
         }
@@ -98,7 +98,7 @@ export default function DashboardLoginPage() {
               <>
                 <div ref={containerRef} className="flex justify-center" />
                 <p className="mt-4 text-xs text-ink-muted">
-                  Доступ только для владельцев заведений и супер-администраторов платформы.
+                  Доступ для владельцев, менеджеров заведений и супер-администраторов платформы.
                 </p>
               </>
             )}

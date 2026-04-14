@@ -175,7 +175,7 @@ BEGIN
     ELSE
       v_new_status := 'occupied';
     END IF;
-  ELSIF NEW.status = 'open' AND OLD.status IN ('paid', 'cancelled', 'free') THEN
+  ELSIF NEW.status = 'open' AND OLD.status IN ('paid', 'cancelled') THEN
     v_new_status := 'occupied';
   ELSE
     -- No table status change needed for in_kitchen / ready transitions

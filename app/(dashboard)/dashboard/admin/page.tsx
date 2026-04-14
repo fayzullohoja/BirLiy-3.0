@@ -10,7 +10,8 @@ import { SkeletonCard, SkeletonStat } from '@/components/dashboard/Skeleton'
 import SubscriptionTimelineChart from '@/components/dashboard/SubscriptionTimelineChart'
 import { normalizeAdminShopRecords, daysLeft, type AdminShopRecord } from '@/lib/dashboard/adminShopUtils'
 import { formatDate } from '@/lib/utils'
-import type { StatsTimelineResponse } from '@/lib/types'
+import { toast } from '@/components/ui/Toast'
+import type { OwnerApplication, OwnerApplicationStatus, StatsTimelineResponse } from '@/lib/types'
 
 interface PlatformStatsResponse {
   shops: number
@@ -31,9 +32,11 @@ export default function DashboardAdminOverviewPage() {
   const [stats, setStats] = useState<PlatformStatsResponse | null>(null)
   const [timeline, setTimeline] = useState<StatsTimelineResponse | null>(null)
   const [shops, setShops] = useState<AdminShopRecord[]>([])
+  const [applications, setApplications] = useState<OwnerApplication[]>([])
   const [days, setDays] = useState<(typeof DAY_OPTIONS)[number]>(30)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [updatingApplicationId, setUpdatingApplicationId] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -43,10 +46,11 @@ export default function DashboardAdminOverviewPage() {
       setError(null)
 
       try {
-        const [statsRes, timelineRes, shopsRes] = await Promise.all([
+        const [statsRes, timelineRes, shopsRes, applicationsRes] = await Promise.all([
           fetch('/api/admin/stats', { cache: 'no-store' }).then((response) => response.json()),
           fetch(`/api/admin/stats/timeline?days=${days}`, { cache: 'no-store' }).then((response) => response.json()),
           fetch('/api/admin/shops', { cache: 'no-store' }).then((response) => response.json()),
+          fetch('/api/admin/owner-applications', { cache: 'no-store' }).then((response) => response.json()),
         ])
 
         if (cancelled) return
@@ -63,10 +67,15 @@ export default function DashboardAdminOverviewPage() {
           setError(shopsRes.error.message)
           return
         }
+        if (applicationsRes.error) {
+          setError(applicationsRes.error.message)
+          return
+        }
 
         setStats(statsRes.data)
         setTimeline(timelineRes.data)
         setShops(shopsRes.data ?? [])
+        setApplications(applicationsRes.data ?? [])
       } catch {
         if (!cancelled) setError('Не удалось загрузить обзор платформы')
       } finally {
@@ -117,6 +126,34 @@ export default function DashboardAdminOverviewPage() {
       .sort((left, right) => daysLeft(left.subscription!.expires_at) - daysLeft(right.subscription!.expires_at))
       .slice(0, 6)
   }, [normalizedShops])
+
+  const pendingApplications = useMemo(
+    () => applications.filter((item) => item.status === 'pending'),
+    [applications],
+  )
+
+  async function handleApplicationStatus(id: string, status: OwnerApplicationStatus) {
+    setUpdatingApplicationId(id)
+    try {
+      const res = await fetch(`/api/admin/owner-applications/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      }).then((response) => response.json())
+
+      if (res.error) {
+        toast.error(res.error.message)
+        return
+      }
+
+      setApplications((prev) => prev.map((item) => item.id === id ? res.data : item))
+      toast.success(`Заявка обновлена: ${APPLICATION_STATUS_LABELS[status]}`)
+    } catch {
+      toast.error('Не удалось обновить заявку')
+    } finally {
+      setUpdatingApplicationId(null)
+    }
+  }
 
   if (error) {
     return (
@@ -226,7 +263,97 @@ export default function DashboardAdminOverviewPage() {
           </div>
         </CardSection>
       </div>
+
+      <CardSection
+        title="Заявки на подключение"
+        action={<span className="text-xs text-ink-muted">Новых: {pendingApplications.length}</span>}
+      >
+        <div className="divide-y divide-surface-border">
+          {loading ? (
+            <div className="space-y-3 p-4">
+              <SkeletonCard className="h-24" />
+              <SkeletonCard className="h-24" />
+            </div>
+          ) : applications.length === 0 ? (
+            <div className="px-4 py-12 text-center text-sm text-ink-secondary">
+              Заявок на подключение пока нет.
+            </div>
+          ) : (
+            applications.slice(0, 8).map((application) => (
+              <div key={application.id} className="flex flex-col gap-4 px-5 py-4 lg:flex-row lg:items-start lg:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <p className="text-base font-semibold text-ink">{application.restaurant_name}</p>
+                    <StatusBadge status={application.status} />
+                  </div>
+                  <p className="mt-2 text-sm text-ink-secondary">
+                    {application.applicant_name} · {application.phone}
+                  </p>
+                  <p className="mt-1 text-xs text-ink-muted">
+                    {application.user?.username ? `@${application.user.username}` : `Telegram ID: ${application.telegram_id}`} · {formatDate(application.created_at)}
+                  </p>
+                  {application.note && (
+                    <p className="mt-2 text-sm text-ink-secondary">
+                      Заметка: {application.note}
+                    </p>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    loading={updatingApplicationId === application.id}
+                    onClick={() => handleApplicationStatus(application.id, 'contacted')}
+                  >
+                    Связались
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    loading={updatingApplicationId === application.id}
+                    onClick={() => handleApplicationStatus(application.id, 'approved')}
+                  >
+                    Одобрено
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    loading={updatingApplicationId === application.id}
+                    onClick={() => handleApplicationStatus(application.id, 'rejected')}
+                  >
+                    Отклонить
+                  </Button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </CardSection>
     </div>
+  )
+}
+
+const APPLICATION_STATUS_LABELS: Record<OwnerApplicationStatus, string> = {
+  pending: 'Новая',
+  contacted: 'Связались',
+  approved: 'Одобрено',
+  rejected: 'Отклонено',
+}
+
+function StatusBadge({ status }: { status: OwnerApplicationStatus }) {
+  const classes =
+    status === 'pending'
+      ? 'bg-amber-50 text-amber-700'
+      : status === 'contacted'
+        ? 'bg-blue-50 text-blue-700'
+        : status === 'approved'
+          ? 'bg-green-50 text-green-700'
+          : 'bg-red-50 text-red-700'
+
+  return (
+    <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${classes}`}>
+      {APPLICATION_STATUS_LABELS[status]}
+    </span>
   )
 }
 

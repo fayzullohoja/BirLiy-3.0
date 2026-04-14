@@ -1,16 +1,19 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import Button from '@/components/ui/Button'
 import { signOutCurrentSession } from '@/lib/auth/clientAuth'
+import { getTelegramWebApp } from '@/lib/telegram/webapp'
 
 interface AppHeaderProps {
   title: string
   subtitle?: string
   leftSlot?: React.ReactNode
   rightSlot?: React.ReactNode
+  dashboardHref?: string
   className?: string
   /** When true, renders a flat header without bottom border — useful over white content */
   flat?: boolean
@@ -28,10 +31,19 @@ export default function AppHeader({
   subtitle,
   leftSlot,
   rightSlot,
+  dashboardHref,
   className,
   flat = false,
   showSignOut = true,
 }: AppHeaderProps) {
+  const pathname = usePathname()
+  const resolvedDashboardHref = useMemo(() => {
+    if (dashboardHref) return dashboardHref
+    if (pathname?.startsWith('/owner')) return '/dashboard/owner'
+    if (pathname?.startsWith('/admin')) return '/dashboard/admin'
+    return null
+  }, [dashboardHref, pathname])
+
   return (
     <header
       className={cn(
@@ -58,6 +70,7 @@ export default function AppHeader({
         {/* Right actions */}
         <div className="relative z-10 ml-auto min-w-10 flex items-center justify-end gap-2 shrink-0">
           {rightSlot}
+          {resolvedDashboardHref && <HeaderDashboardButton href={resolvedDashboardHref} />}
           {showSignOut && <HeaderSignOutButton />}
         </div>
       </div>
@@ -86,6 +99,40 @@ export function HeaderIconButton({ children, label, className, ...props }: Heade
       {...props}
     >
       {children}
+    </button>
+  )
+}
+
+function HeaderDashboardButton({ href }: { href: string }) {
+  function handleOpenDashboard() {
+    if (typeof window === 'undefined') return
+
+    const url = new URL(href, window.location.origin).toString()
+    const telegram = getTelegramWebApp()
+
+    if (telegram?.openLink) {
+      telegram.openLink(url)
+      return
+    }
+
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
+  return (
+    <button
+      type="button"
+      aria-label="Открыть веб-дешборд"
+      title="Открыть веб-дешборд"
+      onClick={handleOpenDashboard}
+      className={cn(
+        'h-9 px-3 flex items-center justify-center',
+        'rounded-xl border border-brand-200 bg-brand-50',
+        'text-[11px] font-bold tracking-[0.12em] text-brand-700 uppercase',
+        'hover:bg-brand-100 active:bg-brand-100',
+        'transition-colors duration-150',
+      )}
+    >
+      Web
     </button>
   )
 }

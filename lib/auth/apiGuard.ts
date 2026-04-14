@@ -12,6 +12,7 @@ import { NextResponse } from 'next/server'
 import { getRequestUser, verifyShopAccess } from './getUser'
 import { err } from '@/lib/utils'
 import type { RequestUser } from '@/lib/types'
+import { isManagementShopRole } from '@/lib/roles'
 
 // ─── Auth guard ───────────────────────────────────────────────────────────────
 
@@ -38,7 +39,7 @@ export async function requireAuth(): Promise<GuardResult<RequestUser>> {
 
 export interface ShopGuardResult {
   userId:    string
-  shopRole:  'owner' | 'waiter' | 'kitchen'
+  shopRole:  'owner' | 'manager' | 'waiter' | 'kitchen'
 }
 
 export interface ShopAdminGuardResult extends ShopGuardResult {
@@ -129,6 +130,26 @@ export async function requireOwnerAccess(
   return result
 }
 
+export async function requireManagementAccess(
+  shopId: string | null | undefined,
+): Promise<GuardResult<ShopGuardResult>> {
+  const result = await requireShopAccess(shopId)
+  if (!result.ok) return result
+
+  if (!isManagementShopRole(result.value.shopRole)) {
+    return {
+      ok: false,
+      value: null,
+      response: NextResponse.json(
+        err('FORBIDDEN', 'Management access required'),
+        { status: 403 },
+      ),
+    }
+  }
+
+  return result
+}
+
 /**
  * Allows either super_admin or the owner of the given shop.
  * Useful for owner-facing dashboard screens that reuse admin/shop endpoints.
@@ -151,13 +172,13 @@ export async function requireShopAdminAccess(
     }
   }
 
-  const ownerResult = await requireOwnerAccess(shopId)
-  if (!ownerResult.ok) return ownerResult as GuardResult<ShopAdminGuardResult>
+  const managementResult = await requireManagementAccess(shopId)
+  if (!managementResult.ok) return managementResult as GuardResult<ShopAdminGuardResult>
 
   return {
     ok: true,
     value: {
-      ...ownerResult.value,
+      ...managementResult.value,
       platformRole: authResult.value.role,
     },
     response: null,

@@ -48,13 +48,15 @@ const DEMO_SHOP_ID = '00000000-0000-0000-0000-000000000001'
 const ROLE_LABELS: Record<UserRole, string> = {
   super_admin: 'Супер-админ',
   owner: 'Владелец',
+  manager: 'Менеджер',
   waiter: 'Официант',
   kitchen: 'Кухня',
 }
 
-const ROLE_VARIANTS: Record<UserRole, 'danger' | 'default' | 'info' | 'warning'> = {
+const ROLE_VARIANTS: Record<UserRole, 'danger' | 'default' | 'info' | 'warning' | 'neutral'> = {
   super_admin: 'danger',
   owner: 'default',
+  manager: 'info',
   waiter: 'info',
   kitchen: 'warning',
 }
@@ -249,6 +251,7 @@ export default function DashboardAdminUserDetailPage() {
             >
               <option value="super_admin">Супер-админ</option>
               <option value="owner">Владелец</option>
+              <option value="manager">Менеджер</option>
               <option value="waiter">Официант</option>
               <option value="kitchen">Кухня</option>
             </FormField>
@@ -275,6 +278,7 @@ export default function DashboardAdminUserDetailPage() {
                   onChange={(value) => setShopRole(value as ShopUserRole)}
                 >
                   <option value="owner">Владелец</option>
+                  <option value="manager">Менеджер</option>
                   <option value="waiter">Официант</option>
                   <option value="kitchen">Кухня</option>
                 </FormField>
@@ -306,8 +310,8 @@ export default function DashboardAdminUserDetailPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Badge variant={membership.role === 'owner' ? 'default' : membership.role === 'kitchen' ? 'warning' : 'info'}>
-                    {membership.role === 'owner' ? 'Владелец' : membership.role === 'kitchen' ? 'Кухня' : 'Официант'}
+                  <Badge variant={membership.role === 'owner' ? 'default' : membership.role === 'kitchen' ? 'warning' : membership.role === 'manager' ? 'info' : 'info'}>
+                    {membership.role === 'owner' ? 'Владелец' : membership.role === 'manager' ? 'Менеджер' : membership.role === 'kitchen' ? 'Кухня' : 'Официант'}
                   </Badge>
                   {!membership.shop?.is_active && <Badge variant="neutral">Неактивно</Badge>}
                 </div>
@@ -322,6 +326,7 @@ export default function DashboardAdminUserDetailPage() {
 
 function inferShopRole(role: UserRole): ShopUserRole {
   if (role === 'owner') return 'owner'
+  if (role === 'manager') return 'manager'
   if (role === 'kitchen') return 'kitchen'
   return 'waiter'
 }

@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { requireOwnerAccess } from '@/lib/auth/apiGuard'
+import { requireManagementAccess } from '@/lib/auth/apiGuard'
 import { err, ok } from '@/lib/utils'
 import type { MenuItem } from '@/lib/types'
 
 /**
  * PATCH /api/menu/[id]
  * Partial update of a menu item.
- * Requires: owner of the item's shop.
+ * Requires: owner or manager of the item's shop.
  *
  * Body: Partial<{ name, price, is_available, sort_order, category_id }>
  */
@@ -31,7 +31,7 @@ export async function PATCH(
       return NextResponse.json(err('NOT_FOUND', 'Menu item not found'), { status: 404 })
     }
 
-    const guard = await requireOwnerAccess(item.shop_id)
+    const guard = await requireManagementAccess(item.shop_id)
     if (!guard.ok) return guard.response
 
     if (body.price !== undefined && (typeof body.price !== 'number' || body.price < 0)) {
@@ -67,7 +67,7 @@ export async function PATCH(
 /**
  * DELETE /api/menu/[id]
  * Removes a menu item.
- * Requires: owner. Blocked if item is referenced by open orders.
+ * Requires: owner or manager. Blocked if item is referenced by open orders.
  */
 export async function DELETE(
   req: NextRequest,
@@ -87,7 +87,7 @@ export async function DELETE(
       return NextResponse.json(err('NOT_FOUND', 'Menu item not found'), { status: 404 })
     }
 
-    const guard = await requireOwnerAccess(item.shop_id)
+    const guard = await requireManagementAccess(item.shop_id)
     if (!guard.ok) return guard.response
 
     // Guard: referenced by open order items?

@@ -53,15 +53,19 @@ cp .env.local.example .env.local
 
 #### Применить миграции
 
-Откройте **SQL Editor** в Supabase Dashboard и выполните файлы по порядку:
+Откройте **SQL Editor** в Supabase Dashboard и выполните файлы строго по порядку:
 
 ```
-supabase/migrations/001_schema.sql      ← таблицы, типы, индексы
-supabase/migrations/002_functions.sql   ← PL/pgSQL триггеры и функции
-supabase/migrations/003_rls.sql         ← Row Level Security политики
-supabase/migrations/004_payment_types.sql ← PayMe и Click способы оплаты
-supabase/seed.sql                       ← демо-данные (только для разработки!)
+supabase/migrations/001_schema.sql           ← таблицы, типы, индексы
+supabase/migrations/002_functions.sql        ← PL/pgSQL триггеры и функции
+supabase/migrations/003_rls.sql              ← Row Level Security политики
+supabase/migrations/004_payment_types.sql    ← PayMe и Click способы оплаты
+supabase/migrations/005_kitchen_roles.sql    ← роль kitchen в enum
+supabase/migrations/006_order_item_kitchen_flow.sql  ← кухонный флоу + исправление триггера
+supabase/seed.sql                            ← демо-данные (только для разработки!)
 ```
+
+> ⚠️ **Важно:** миграции 005 и 006 обязательны. Без 006 кнопка «На кухню» будет возвращать ошибку 500 из-за неявного каста типов в триггере `recalc_order_snapshot`.
 
 > **Альтернатива через CLI:**
 > ```bash

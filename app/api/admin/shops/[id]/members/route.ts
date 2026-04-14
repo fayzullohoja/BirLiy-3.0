@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
 import { requireShopAdminAccess } from '@/lib/auth/apiGuard'
 import { err, ok } from '@/lib/utils'
+import { canAssignShopRole, canRemoveStaffRole, isManagementShopRole } from '@/lib/roles'
 
 /**
  * POST /api/admin/shops/[id]/members
- * Assign a user to a shop with a given role (owner, waiter or kitchen).
+ * Assign a user to a shop with a given role.
  * If the user already belongs to this shop, updates their role.
  * Body: { user_id, role }
- * Requires: super_admin or owner of this shop.
+ * Requires: super_admin, owner or manager of this shop.
  */
 export async function POST(
   req: NextRequest,
@@ -24,8 +25,22 @@ export async function POST(
   if (!user_id) {
     return NextResponse.json(err('VALIDATION', 'user_id is required'), { status: 400 })
   }
-  if (role !== 'owner' && role !== 'waiter' && role !== 'kitchen') {
-    return NextResponse.json(err('VALIDATION', 'role must be owner, waiter or kitchen'), { status: 400 })
+  if (role !== 'owner' && role !== 'manager' && role !== 'waiter' && role !== 'kitchen') {
+    return NextResponse.json(err('VALIDATION', 'role must be owner, manager, waiter or kitchen'), { status: 400 })
+  }
+
+  const actorRole = guard.value.platformRole === 'super_admin'
+    ? 'super_admin'
+    : isManagementShopRole(guard.value.shopRole)
+      ? guard.value.shopRole
+      : null
+
+  if (!actorRole) {
+    return NextResponse.json(err('FORBIDDEN', 'Shop management access required'), { status: 403 })
+  }
+
+  if (!canAssignShopRole(actorRole, role)) {
+    return NextResponse.json(err('FORBIDDEN', 'You cannot assign this role'), { status: 403 })
   }
 
   const supabase = createServiceClient()
@@ -91,7 +106,7 @@ export async function POST(
 /**
  * DELETE /api/admin/shops/[id]/members?user_id=xxx
  * Remove a user from the shop.
- * Requires: super_admin or owner of this shop.
+ * Requires: super_admin, owner or manager of this shop.
  */
 export async function DELETE(
   req: NextRequest,
@@ -113,6 +128,36 @@ export async function DELETE(
   }
 
   const supabase = createServiceClient()
+  const { data: existingMembership, error: membershipError } = await supabase
+    .from('shop_users')
+    .select('id, role')
+    .eq('shop_id', shopId)
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (membershipError) {
+    console.error('[admin/shops/[id]/members DELETE membership]', membershipError)
+    return NextResponse.json(err('DB_ERROR', 'Failed to inspect shop membership'), { status: 500 })
+  }
+
+  if (!existingMembership) {
+    return NextResponse.json(err('NOT_FOUND', 'Membership not found'), { status: 404 })
+  }
+
+  const actorRole = guard.value.platformRole === 'super_admin'
+    ? 'super_admin'
+    : isManagementShopRole(guard.value.shopRole)
+      ? guard.value.shopRole
+      : null
+
+  if (!actorRole) {
+    return NextResponse.json(err('FORBIDDEN', 'Shop management access required'), { status: 403 })
+  }
+
+  if (!canRemoveStaffRole(actorRole, existingMembership.role)) {
+    return NextResponse.json(err('FORBIDDEN', 'You cannot remove this role from the shop'), { status: 403 })
+  }
+
   const { error } = await supabase
     .from('shop_users')
     .delete()

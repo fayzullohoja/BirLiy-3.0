@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { requireOwnerAccess } from '@/lib/auth/apiGuard'
+import { requireManagementAccess } from '@/lib/auth/apiGuard'
 import { err, ok } from '@/lib/utils'
 import type { BookingStatus, TableBooking } from '@/lib/types'
 
@@ -15,7 +15,7 @@ const VALID_STATUSES: BookingStatus[] = ['confirmed', 'seated', 'cancelled', 'no
  *   - seated    → set table to 'occupied' (if currently free/reserved)
  *   - cancelled/no_show → no automatic table change (owner handles it)
  *
- * Requires: owner.
+ * Requires: owner or manager.
  */
 export async function PATCH(
   req: NextRequest,
@@ -36,7 +36,7 @@ export async function PATCH(
       return NextResponse.json(err('NOT_FOUND', 'Booking not found'), { status: 404 })
     }
 
-    const guard = await requireOwnerAccess(booking.shop_id)
+    const guard = await requireManagementAccess(booking.shop_id)
     if (!guard.ok) return guard.response
 
     if (body.status && !VALID_STATUSES.includes(body.status)) {
@@ -101,7 +101,7 @@ export async function PATCH(
 /**
  * DELETE /api/bookings/[id]
  * Removes a booking. If it was confirmed, frees the table.
- * Requires: owner.
+ * Requires: owner or manager.
  */
 export async function DELETE(
   req: NextRequest,
@@ -121,7 +121,7 @@ export async function DELETE(
       return NextResponse.json(err('NOT_FOUND', 'Booking not found'), { status: 404 })
     }
 
-    const guard = await requireOwnerAccess(booking.shop_id)
+    const guard = await requireManagementAccess(booking.shop_id)
     if (!guard.ok) return guard.response
 
     const { error } = await supabase.from('table_bookings').delete().eq('id', id)

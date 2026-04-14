@@ -36,6 +36,7 @@ const PUBLIC_API_PREFIXES = ['/api/auth', '/api/version', '/_next', '/favicon']
 const ROLE_HOME: Record<UserRole, string> = {
   waiter:      '/waiter',
   kitchen:     '/kitchen',
+  manager:     '/owner',
   owner:       '/owner',
   super_admin: '/admin',
 }
@@ -109,7 +110,7 @@ export async function middleware(req: NextRequest) {
   // ── Dashboard web panel (browser, desktop) ───────────────────────────────
 
   if (pathname.startsWith('/dashboard')) {
-    if (!['owner', 'super_admin'].includes(role)) {
+    if (!['owner', 'manager', 'super_admin'].includes(role)) {
       return NextResponse.redirect(new URL(ROLE_HOME[role], req.url))
     }
 
@@ -137,12 +138,12 @@ export async function middleware(req: NextRequest) {
     }
 
     // /owner is owner or super_admin
-    if (pathname.startsWith('/owner') && !['owner', 'super_admin'].includes(role)) {
+    if (pathname.startsWith('/owner') && !['owner', 'manager', 'super_admin'].includes(role)) {
       return NextResponse.redirect(new URL(ROLE_HOME[role], req.url))
     }
 
     // /kitchen is accessible by kitchen, owner or super_admin
-    if (pathname.startsWith('/kitchen') && !['kitchen', 'owner', 'super_admin'].includes(role)) {
+    if (pathname.startsWith('/kitchen') && !['kitchen', 'owner', 'manager', 'super_admin'].includes(role)) {
       return NextResponse.redirect(new URL(ROLE_HOME[role], req.url))
     }
 

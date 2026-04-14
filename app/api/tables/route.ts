@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { requireShopAccess, requireOwnerAccess } from '@/lib/auth/apiGuard'
+import { requireManagementAccess, requireShopAccess } from '@/lib/auth/apiGuard'
 import { err, ok } from '@/lib/utils'
 import type { Table } from '@/lib/types'
 
@@ -33,7 +33,7 @@ export async function GET(req: NextRequest) {
 /**
  * POST /api/tables
  * Creates a new table.
- * Requires: owner.
+ * Requires: owner or manager.
  *
  * Body: { shop_id, number, name, capacity? }
  */
@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
   try {
     const body   = await req.json()
     const shopId = body?.shop_id as string | undefined
-    const guard  = await requireOwnerAccess(shopId)
+    const guard  = await requireManagementAccess(shopId)
     if (!guard.ok) return guard.response
 
     const { number, name, capacity = 4 } = body

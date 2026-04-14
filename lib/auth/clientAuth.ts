@@ -77,7 +77,7 @@ export function resolveAuthDestination(data: AuthResponse): string {
     ? '/admin'
     : data.role === 'kitchen'
       ? '/kitchen'
-    : data.role === 'owner'
+    : data.role === 'owner' || data.role === 'manager'
       ? '/owner'
       : '/waiter'
 }

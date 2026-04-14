@@ -2,7 +2,7 @@ import DashboardLayout from '@/components/dashboard/DashboardLayout'
 import { DashboardSessionProvider } from '@/components/dashboard/DashboardSessionContext'
 import type { DashboardNavItemConfig } from '@/components/dashboard/NavItem'
 
-const OWNER_ALLOWED_ROLES = ['owner', 'super_admin'] as const
+const OWNER_ALLOWED_ROLES = ['owner', 'manager', 'super_admin'] as const
 
 const OWNER_NAV_ITEMS: DashboardNavItemConfig[] = [
   { href: '/dashboard/owner', label: 'Аналитика', icon: <ChartIcon />, exact: true },
@@ -11,7 +11,7 @@ const OWNER_NAV_ITEMS: DashboardNavItemConfig[] = [
   { href: '/dashboard/owner/tables', label: 'Столы', icon: <TablesIcon /> },
   { href: '/dashboard/owner/staff', label: 'Персонал', icon: <UsersIcon /> },
   { href: '/dashboard/owner/bookings', label: 'Бронирования', icon: <CalendarIcon /> },
-  { href: '/dashboard/owner/settings', label: 'Настройки', icon: <SettingsIcon /> },
+  { href: '/dashboard/owner/settings', label: 'Настройки', icon: <SettingsIcon />, allowedRoles: ['owner', 'super_admin'] },
 ]
 
 export default function DashboardOwnerLayout({

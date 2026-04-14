@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { requireOwnerAccess } from '@/lib/auth/apiGuard'
+import { requireManagementAccess } from '@/lib/auth/apiGuard'
 import { err, ok } from '@/lib/utils'
 import type { MenuCategory } from '@/lib/types'
 
 /**
  * PATCH /api/categories/[id]
  * Updates a category name or sort_order.
- * Requires: owner.
+ * Requires: owner or manager.
  */
 export async function PATCH(
   req: NextRequest,
@@ -28,7 +28,7 @@ export async function PATCH(
       return NextResponse.json(err('NOT_FOUND', 'Category not found'), { status: 404 })
     }
 
-    const guard = await requireOwnerAccess(cat.shop_id)
+    const guard = await requireManagementAccess(cat.shop_id)
     if (!guard.ok) return guard.response
 
     const updates: Record<string, unknown> = {}
@@ -62,7 +62,7 @@ export async function PATCH(
  * DELETE /api/categories/[id]
  * Removes a category.
  * Items in this category are set to category_id = NULL (not deleted).
- * Requires: owner.
+ * Requires: owner or manager.
  */
 export async function DELETE(
   req: NextRequest,
@@ -82,7 +82,7 @@ export async function DELETE(
       return NextResponse.json(err('NOT_FOUND', 'Category not found'), { status: 404 })
     }
 
-    const guard = await requireOwnerAccess(cat.shop_id)
+    const guard = await requireManagementAccess(cat.shop_id)
     if (!guard.ok) return guard.response
 
     // Unlink items before deleting (FK is nullable, so set to NULL)

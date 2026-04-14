@@ -191,7 +191,10 @@ export async function PATCH(
 
       if (sendErr) {
         console.error('[orders PATCH] send to kitchen:', sendErr)
-        return NextResponse.json(err('DB_ERROR', 'Failed to send pending items to the kitchen'), { status: 500 })
+        return NextResponse.json(
+          err('DB_ERROR', sendErr.message ?? 'Failed to send pending items to the kitchen'),
+          { status: 500 },
+        )
       }
 
       const updated = await loadFullOrder(supabase, id)

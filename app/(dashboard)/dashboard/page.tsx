@@ -20,7 +20,7 @@ export default async function DashboardIndexPage() {
     redirect('/dashboard/admin')
   }
 
-  if (payload.app_role === 'owner') {
+  if (payload.app_role === 'owner' || payload.app_role === 'manager') {
     redirect('/dashboard/owner')
   }
 

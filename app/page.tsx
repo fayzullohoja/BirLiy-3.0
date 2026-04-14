@@ -16,7 +16,7 @@ import type { AuthResponse, ApiResponse } from '@/lib/types'
  *  4. Redirect to the correct dashboard OR gateway page.
  *
  * Dev mode:
- *  - ?role=waiter|kitchen|owner|admin  bypasses Telegram validation.
+ *  - ?role=waiter|kitchen|manager|owner|admin bypasses Telegram validation.
  *  - A real session cookie is still issued via the dev auth path.
  */
 
@@ -44,7 +44,7 @@ export default function RootPage() {
 
       let body: Record<string, unknown>
 
-      if (devRole && ['waiter', 'kitchen', 'owner', 'super_admin', 'admin'].includes(devRole)) {
+      if (devRole && ['waiter', 'kitchen', 'manager', 'owner', 'super_admin', 'admin'].includes(devRole)) {
         // Dev bypass — map 'admin' alias
         const mappedRole = devRole === 'admin' ? 'super_admin' : devRole
         body = {
@@ -92,7 +92,7 @@ export default function RootPage() {
       const destination =
         role === 'super_admin' ? '/admin' :
         role === 'kitchen'     ? '/kitchen' :
-        role === 'owner'       ? '/owner' :
+        role === 'owner' || role === 'manager' ? '/owner' :
         '/waiter'
 
       router.replace(destination)

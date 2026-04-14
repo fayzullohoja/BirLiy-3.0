@@ -20,6 +20,10 @@ export default function DashboardLayout({
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const session = useDashboardSession()
+  const filteredNavItems = navItems.filter((item) => {
+    if (!item.allowedRoles || !session.role) return true
+    return item.allowedRoles.includes(session.role)
+  })
 
   if (session.loading) {
     return (
@@ -38,7 +42,7 @@ export default function DashboardLayout({
       <Sidebar
         title="BirLiy Kassa"
         subtitle="Web Dashboard"
-        items={navItems}
+        items={filteredNavItems}
         collapsed={collapsed}
         mobileOpen={mobileOpen}
         onToggle={() => setCollapsed((prev) => !prev)}
@@ -47,7 +51,7 @@ export default function DashboardLayout({
 
       <div className={collapsed ? 'md:pl-[92px]' : 'md:pl-[272px]'}>
         <TopBar
-          navItems={navItems}
+          navItems={filteredNavItems}
           sectionLabel={sectionLabel}
           onOpenSidebar={() => setMobileOpen(true)}
         />

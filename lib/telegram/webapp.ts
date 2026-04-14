@@ -70,6 +70,7 @@ export interface TelegramWebApp {
 
   showAlert(message: string, callback?: () => void): void
   showConfirm(message: string, callback: (confirmed: boolean) => void): void
+  openLink(url: string): void
   showPopup(params: {
     title?: string
     message: string

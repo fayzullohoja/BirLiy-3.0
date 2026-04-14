@@ -40,6 +40,7 @@ export default function DashboardOwnerSettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const isManager = session.role === 'manager'
 
   useEffect(() => {
     if (!session.selectedShopId) return
@@ -119,6 +120,14 @@ export default function DashboardOwnerSettingsPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  if (!session.loading && isManager) {
+    return (
+      <div className="rounded-3xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-800">
+        Настройки заведения и подписки доступны только владельцу или супер-администратору.
+      </div>
+    )
   }
 
   if (loading || session.loading) {

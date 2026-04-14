@@ -45,12 +45,14 @@ const PLAN_LABELS: Record<SubPlan, string> = {
 
 const ROLE_LABELS: Record<ShopUserRole, string> = {
   owner: 'Владелец',
+  manager: 'Менеджер',
   kitchen: 'Кухня',
   waiter: 'Официант',
 }
 
-const ROLE_BADGE_VARIANTS: Record<ShopUserRole, 'default' | 'warning' | 'info'> = {
+const ROLE_BADGE_VARIANTS: Record<ShopUserRole, 'default' | 'warning' | 'info' | 'neutral'> = {
   owner: 'default',
+  manager: 'info',
   kitchen: 'warning',
   waiter: 'info',
 }
@@ -178,6 +180,7 @@ export default function DashboardAdminRestaurantDetailPage() {
 
   const groupedMembers = useMemo(() => ({
     owner: shop?.members.filter((member) => member.role === 'owner') ?? [],
+    manager: shop?.members.filter((member) => member.role === 'manager') ?? [],
     kitchen: shop?.members.filter((member) => member.role === 'kitchen') ?? [],
     waiter: shop?.members.filter((member) => member.role === 'waiter') ?? [],
   }), [shop?.members])
@@ -444,6 +447,7 @@ export default function DashboardAdminRestaurantDetailPage() {
         >
           <div className="space-y-6 p-5">
             <RoleSection title="Владельцы" members={groupedMembers.owner} onRemove={setRemoveTarget} />
+            <RoleSection title="Менеджеры" members={groupedMembers.manager} onRemove={setRemoveTarget} />
             <RoleSection title="Кухня" members={groupedMembers.kitchen} onRemove={setRemoveTarget} />
             <RoleSection title="Официанты" members={groupedMembers.waiter} onRemove={setRemoveTarget} />
           </div>
@@ -557,6 +561,7 @@ export default function DashboardAdminRestaurantDetailPage() {
             >
               <option value="waiter">Официант</option>
               <option value="kitchen">Кухня</option>
+              <option value="manager">Менеджер</option>
               <option value="owner">Владелец</option>
             </FormField>
 

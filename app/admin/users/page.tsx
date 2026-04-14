@@ -28,13 +28,15 @@ interface ShopOption {
 const ROLE_LABELS: Record<UserRole, string> = {
   super_admin: 'Супер-Админ',
   owner:       'Владелец',
+  manager:     'Менеджер',
   kitchen:     'Кухня',
   waiter:      'Официант',
 }
 
-const ROLE_BADGE: Record<UserRole, 'danger' | 'info' | 'warning' | 'neutral'> = {
+const ROLE_BADGE: Record<UserRole, 'danger' | 'info' | 'warning' | 'neutral' | 'default'> = {
   super_admin: 'danger',
-  owner:       'info',
+  owner:       'default',
+  manager:     'info',
   kitchen:     'warning',
   waiter:      'neutral',
 }
@@ -43,6 +45,7 @@ const FILTER_OPTIONS: { value: '' | UserRole; label: string }[] = [
   { value: '',            label: 'Все' },
   { value: 'super_admin', label: 'Супер-Админ' },
   { value: 'owner',       label: 'Владельцы' },
+  { value: 'manager',     label: 'Менеджеры' },
   { value: 'kitchen',     label: 'Кухня' },
   { value: 'waiter',      label: 'Официанты' },
 ]
@@ -145,6 +148,8 @@ export default function AdminUsersPage() {
                   shop_role:
                     newRole === 'owner'
                       ? 'owner'
+                      : newRole === 'manager'
+                        ? 'manager'
                       : newRole === 'kitchen'
                         ? 'kitchen'
                         : newRole === 'waiter'
@@ -248,7 +253,7 @@ export default function AdminUsersPage() {
             </p>
           )}
           <div className="flex flex-col gap-2">
-            {(['waiter', 'kitchen', 'owner', 'super_admin'] as UserRole[]).map(r => (
+            {(['waiter', 'kitchen', 'manager', 'owner', 'super_admin'] as UserRole[]).map(r => (
               <button
                 key={r}
                 onClick={() => {
@@ -277,6 +282,8 @@ export default function AdminUsersPage() {
                 disabled={shopsLoading}
                 hint={newRole === 'owner'
                   ? 'Для владельца по умолчанию выбрано демо-заведение'
+                  : newRole === 'manager'
+                    ? 'Выберите заведение, где пользователь будет работать менеджером'
                   : newRole === 'kitchen'
                     ? 'Выберите заведение, где пользователь будет работать на кухне'
                     : 'Выберите заведение, где пользователь будет работать'}
@@ -294,7 +301,13 @@ export default function AdminUsersPage() {
                 <p className="text-xs text-ink-muted">
                   Роль в заведении будет назначена как{' '}
                   <strong className="text-ink">
-                    {newRole === 'owner' ? 'владелец' : newRole === 'kitchen' ? 'кухня' : 'официант'}
+                    {newRole === 'owner'
+                      ? 'владелец'
+                      : newRole === 'manager'
+                        ? 'менеджер'
+                        : newRole === 'kitchen'
+                          ? 'кухня'
+                          : 'официант'}
                   </strong>.
                 </p>
               </div>

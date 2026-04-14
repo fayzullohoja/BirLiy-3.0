@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { requireShopAccess, requireOwnerAccess } from '@/lib/auth/apiGuard'
+import { requireManagementAccess, requireShopAccess } from '@/lib/auth/apiGuard'
 import { err, ok } from '@/lib/utils'
 import type { MenuCategory } from '@/lib/types'
 
@@ -32,7 +32,7 @@ export async function GET(req: NextRequest) {
 /**
  * POST /api/categories
  * Creates a new menu category.
- * Requires: owner.
+ * Requires: owner or manager.
  *
  * Body: { shop_id, name, sort_order? }
  */
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
   try {
     const body   = await req.json()
     const shopId = body?.shop_id as string | undefined
-    const guard  = await requireOwnerAccess(shopId)
+    const guard  = await requireManagementAccess(shopId)
     if (!guard.ok) return guard.response
 
     const { name, sort_order = 0 } = body

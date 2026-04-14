@@ -1,7 +1,7 @@
 -- ============================================================
 -- BirLiy Kassa — Development Seed Data
 -- WARNING: Do NOT run in production.
--- Run AFTER all migrations (001 → 002 → 003 → 004).
+-- Run AFTER all migrations (001 → 002 → 003 → 004 → 005 → 006).
 --
 -- This seed creates a realistic demo environment:
 --   - 2 active shops + 1 expired shop

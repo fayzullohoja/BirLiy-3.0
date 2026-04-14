@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/server'
-import { requireAuth, requireOwnerAccess } from '@/lib/auth/apiGuard'
+import { requireAuth, requireManagementAccess } from '@/lib/auth/apiGuard'
 import { err, ok } from '@/lib/utils'
 import { mapAdminUser, type AdminUserRecord } from '@/lib/admin/userUtils'
 
@@ -8,7 +8,7 @@ import { mapAdminUser, type AdminUserRecord } from '@/lib/admin/userUtils'
  * GET /api/admin/users?role=waiter&search=text
  * List all platform users with their shop memberships.
  * Optional query params:
- *   role   — filter by user_role (super_admin | owner | waiter | kitchen)
+ *   role   — filter by user_role (super_admin | owner | manager | waiter | kitchen)
  *   search — partial match on name or username (case-insensitive)
  * Requires: super_admin.
  * Owner dashboard may also call this endpoint with ?shop_id=... to search
@@ -24,8 +24,8 @@ export async function GET(req: NextRequest) {
 
   const isSuperAdmin = authGuard.value.role === 'super_admin'
   if (!isSuperAdmin) {
-    const ownerGuard = await requireOwnerAccess(shopId)
-    if (!ownerGuard.ok) return ownerGuard.response
+    const managementGuard = await requireManagementAccess(shopId)
+    if (!managementGuard.ok) return managementGuard.response
   }
 
   const supabase = createServiceClient()

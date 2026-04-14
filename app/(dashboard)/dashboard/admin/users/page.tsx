@@ -28,18 +28,20 @@ interface AdminUserRow {
   }>
 }
 
-const ROLE_FILTERS: Array<'all' | UserRole> = ['all', 'super_admin', 'owner', 'waiter', 'kitchen']
+const ROLE_FILTERS: Array<'all' | UserRole> = ['all', 'super_admin', 'owner', 'manager', 'waiter', 'kitchen']
 
 const ROLE_LABELS: Record<UserRole, string> = {
   super_admin: 'Супер-админ',
   owner: 'Владелец',
+  manager: 'Менеджер',
   waiter: 'Официант',
   kitchen: 'Кухня',
 }
 
-const ROLE_VARIANTS: Record<UserRole, 'danger' | 'default' | 'info' | 'warning'> = {
+const ROLE_VARIANTS: Record<UserRole, 'danger' | 'default' | 'info' | 'warning' | 'neutral'> = {
   super_admin: 'danger',
   owner: 'default',
+  manager: 'info',
   waiter: 'info',
   kitchen: 'warning',
 }
@@ -92,6 +94,7 @@ export default function DashboardAdminUsersPage() {
     all: users.length,
     super_admin: users.filter((user) => user.role === 'super_admin').length,
     owner: users.filter((user) => user.role === 'owner').length,
+    manager: users.filter((user) => user.role === 'manager').length,
     waiter: users.filter((user) => user.role === 'waiter').length,
     kitchen: users.filter((user) => user.role === 'kitchen').length,
   }), [users])
