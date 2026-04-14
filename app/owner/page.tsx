@@ -5,7 +5,9 @@ import { useRouter } from 'next/navigation'
 import AppHeader from '@/components/layout/AppHeader'
 import PageContainer, { Section } from '@/components/ui/PageContainer'
 import { StatCard } from '@/components/ui/Card'
+import { toast } from '@/components/ui/Toast'
 import { formatUZS, formatDate } from '@/lib/utils'
+import { getTelegramWebApp } from '@/lib/telegram/webapp'
 import { useOwnerSession } from './_context/OwnerSessionContext'
 import type { AnalyticsResponse } from '../api/analytics/route'
 
@@ -13,9 +15,10 @@ export default function OwnerDashboardPage() {
   const session = useOwnerSession()
   const router  = useRouter()
 
-  const [stats, setStats]     = useState<AnalyticsResponse | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError]     = useState<string | null>(null)
+  const [stats, setStats]           = useState<AnalyticsResponse | null>(null)
+  const [loading, setLoading]       = useState(true)
+  const [error, setError]           = useState<string | null>(null)
+  const [openingDash, setOpeningDash] = useState(false)
 
   useEffect(() => {
     if (session.loading) return
@@ -37,6 +40,32 @@ export default function OwnerDashboardPage() {
   const today   = stats?.today
   const days    = stats?.last7days ?? []
   const waiters = stats?.waiters ?? []
+
+  async function openDashboard() {
+    setOpeningDash(true)
+    try {
+      const res  = await fetch('/api/auth/magic', { method: 'POST' })
+      const json = await res.json()
+      if (json.error) {
+        toast.error(json.error.message ?? 'Не удалось открыть веб-панель')
+        return
+      }
+      const url = json.data?.url
+      if (url) {
+        const twa = getTelegramWebApp()
+        if (twa) {
+          twa.openLink(url)
+        } else {
+          // Fallback for local dev — open in new tab
+          window.open(url, '_blank')
+        }
+      }
+    } catch {
+      toast.error('Не удалось открыть веб-панель')
+    } finally {
+      setOpeningDash(false)
+    }
+  }
 
   return (
     <>
@@ -87,6 +116,7 @@ export default function OwnerDashboardPage() {
             <QuickTile label="История заказов"     icon={<HistoryIcon />} onClick={() => router.push('/owner/orders')}  color="amber"  />
             <QuickTile label="Кухня"               icon={<KitchenIcon />} onClick={() => router.push('/kitchen')}       color="orange" />
             <QuickTile label="Персонал"             icon={<StaffIcon />}   onClick={() => router.push('/owner/staff')}   color="purple" />
+            <QuickTile label="Веб-панель"           icon={<DashboardIcon />} onClick={openDashboard} color="teal" loading={openingDash} />
           </div>
         </Section>
 
@@ -151,8 +181,8 @@ export default function OwnerDashboardPage() {
 
 // ─── Quick nav tile ───────────────────────────────────────────────────────────
 
-function QuickTile({ label, icon, onClick, color }: {
-  label: string; icon: React.ReactNode; onClick: () => void; color: string
+function QuickTile({ label, icon, onClick, color, loading }: {
+  label: string; icon: React.ReactNode; onClick: () => void; color: string; loading?: boolean
 }) {
   const styles: Record<string, string> = {
     green:  'bg-green-50  border-green-200  text-green-700',
@@ -160,13 +190,15 @@ function QuickTile({ label, icon, onClick, color }: {
     amber:  'bg-amber-50  border-amber-200  text-amber-700',
     orange: 'bg-orange-50 border-orange-200 text-orange-700',
     purple: 'bg-purple-50 border-purple-200 text-purple-700',
+    teal:   'bg-teal-50   border-teal-200   text-teal-700',
   }
   return (
     <button
       onClick={onClick}
-      className={`flex flex-col items-start gap-3 p-4 rounded-2xl border ${styles[color]} active:scale-95 transition-transform`}
+      disabled={loading}
+      className={`flex flex-col items-start gap-3 p-4 rounded-2xl border ${styles[color]} active:scale-95 transition-transform disabled:opacity-60`}
     >
-      <span className="opacity-80">{icon}</span>
+      <span className="opacity-80">{loading ? <SpinnerIcon /> : icon}</span>
       <span className="text-sm font-semibold leading-tight text-left">{label}</span>
     </button>
   )
@@ -211,4 +243,10 @@ function KitchenIcon() {
 }
 function StaffIcon() {
   return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+}
+function DashboardIcon() {
+  return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>
+}
+function SpinnerIcon() {
+  return <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="animate-spin"><path d="M21 12a9 9 0 1 1-6.219-8.56" /></svg>
 }
