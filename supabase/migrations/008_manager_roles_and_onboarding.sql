@@ -33,7 +33,7 @@ CREATE TABLE IF NOT EXISTS public.shop_invite_codes (
   created_at  TIMESTAMPTZ           NOT NULL DEFAULT NOW(),
   updated_at  TIMESTAMPTZ           NOT NULL DEFAULT NOW(),
   CONSTRAINT shop_invite_codes_code_format CHECK (code ~ '^[0-9]{8}$'),
-  CONSTRAINT shop_invite_codes_role_scope CHECK (role IN ('manager', 'waiter', 'kitchen'))
+  CONSTRAINT shop_invite_codes_role_scope CHECK (role::text IN ('manager', 'waiter', 'kitchen'))
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS shop_invite_codes_code_uidx
@@ -102,7 +102,7 @@ CREATE POLICY shop_invite_codes_read_manageable ON public.shop_invite_codes
       FROM public.shop_users su
       WHERE su.user_id = auth.uid()
         AND su.shop_id = shop_id
-        AND su.role IN ('owner', 'manager')
+        AND su.role::text IN ('owner', 'manager')
     )
   );
 
@@ -116,8 +116,8 @@ CREATE POLICY shop_invite_codes_insert_manageable ON public.shop_invite_codes
       WHERE su.user_id = auth.uid()
         AND su.shop_id = shop_id
         AND (
-          (su.role = 'owner' AND role IN ('manager', 'waiter', 'kitchen'))
-          OR (su.role = 'manager' AND role IN ('waiter', 'kitchen'))
+          (su.role::text = 'owner' AND role::text IN ('manager', 'waiter', 'kitchen'))
+          OR (su.role::text = 'manager' AND role::text IN ('waiter', 'kitchen'))
         )
     )
   );
@@ -132,8 +132,8 @@ CREATE POLICY shop_invite_codes_update_manageable ON public.shop_invite_codes
       WHERE su.user_id = auth.uid()
         AND su.shop_id = shop_id
         AND (
-          (su.role = 'owner' AND role IN ('manager', 'waiter', 'kitchen'))
-          OR (su.role = 'manager' AND role IN ('waiter', 'kitchen'))
+          (su.role::text = 'owner' AND role::text IN ('manager', 'waiter', 'kitchen'))
+          OR (su.role::text = 'manager' AND role::text IN ('waiter', 'kitchen'))
         )
     )
   )
@@ -145,8 +145,8 @@ CREATE POLICY shop_invite_codes_update_manageable ON public.shop_invite_codes
       WHERE su.user_id = auth.uid()
         AND su.shop_id = shop_id
         AND (
-          (su.role = 'owner' AND role IN ('manager', 'waiter', 'kitchen'))
-          OR (su.role = 'manager' AND role IN ('waiter', 'kitchen'))
+          (su.role::text = 'owner' AND role::text IN ('manager', 'waiter', 'kitchen'))
+          OR (su.role::text = 'manager' AND role::text IN ('waiter', 'kitchen'))
         )
     )
   );
@@ -161,8 +161,8 @@ CREATE POLICY shop_invite_codes_delete_manageable ON public.shop_invite_codes
       WHERE su.user_id = auth.uid()
         AND su.shop_id = shop_id
         AND (
-          (su.role = 'owner' AND role IN ('manager', 'waiter', 'kitchen'))
-          OR (su.role = 'manager' AND role IN ('waiter', 'kitchen'))
+          (su.role::text = 'owner' AND role::text IN ('manager', 'waiter', 'kitchen'))
+          OR (su.role::text = 'manager' AND role::text IN ('waiter', 'kitchen'))
         )
     )
   );

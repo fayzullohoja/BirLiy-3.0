@@ -66,7 +66,6 @@ export default function DashboardLoginPage() {
     script.setAttribute('data-telegram-login', botUsername)
     script.setAttribute('data-size', 'large')
     script.setAttribute('data-radius', '14')
-    script.setAttribute('data-request-access', 'write')
     script.setAttribute('data-onauth', 'onTelegramAuth(user)')
     container.appendChild(script)
 
