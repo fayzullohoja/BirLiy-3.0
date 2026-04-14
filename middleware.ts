@@ -27,7 +27,7 @@ import type { UserRole } from '@/lib/types'
 const PROTECTED_PREFIXES = ['/waiter', '/kitchen', '/owner', '/admin']
 
 /** Routes that are always public (no auth needed) */
-const PUBLIC_PATHS = ['/', '/not-connected', '/subscription-blocked', '/dashboard/login', '/dashboard/not-authorized']
+const PUBLIC_PATHS = ['/', '/not-connected', '/subscription-blocked', '/dashboard/login', '/dashboard/not-authorized', '/dashboard/auth']
 
 /** API routes that skip session verification (handled internally) */
 const PUBLIC_API_PREFIXES = ['/api/auth', '/api/version', '/_next', '/favicon']
