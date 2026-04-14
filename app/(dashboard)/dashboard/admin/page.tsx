@@ -41,9 +41,11 @@ export default function DashboardAdminOverviewPage() {
   useEffect(() => {
     let cancelled = false
 
-    async function load() {
-      setLoading(true)
-      setError(null)
+    async function load({ silent = false } = {}) {
+      if (!silent) {
+        setLoading(true)
+        setError(null)
+      }
 
       try {
         const [statsRes, timelineRes, shopsRes, applicationsRes] = await Promise.all([
@@ -72,6 +74,7 @@ export default function DashboardAdminOverviewPage() {
           return
         }
 
+        setError(null)
         setStats(statsRes.data)
         setTimeline(timelineRes.data)
         setShops(shopsRes.data ?? [])
@@ -79,13 +82,30 @@ export default function DashboardAdminOverviewPage() {
       } catch {
         if (!cancelled) setError('Не удалось загрузить обзор платформы')
       } finally {
-        if (!cancelled) setLoading(false)
+        if (!cancelled && !silent) setLoading(false)
+      }
+    }
+
+    function handleRefreshSignal() {
+      if (document.visibilityState === 'visible') {
+        void load({ silent: true })
       }
     }
 
     void load()
+
+    const intervalId = window.setInterval(() => {
+      void load({ silent: true })
+    }, 15000)
+
+    window.addEventListener('focus', handleRefreshSignal)
+    document.addEventListener('visibilitychange', handleRefreshSignal)
+
     return () => {
       cancelled = true
+      window.clearInterval(intervalId)
+      window.removeEventListener('focus', handleRefreshSignal)
+      document.removeEventListener('visibilitychange', handleRefreshSignal)
     }
   }, [days])
 

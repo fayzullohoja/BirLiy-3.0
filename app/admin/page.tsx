@@ -34,11 +34,19 @@ export default function AdminDashboardPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null)
 
   useEffect(() => {
-    Promise.all([
-      fetch('/api/admin/stats').then(r => r.json()),
-      fetch('/api/admin/owner-applications', { cache: 'no-store' }).then(r => r.json()),
-    ])
-      .then(([statsRes, applicationsRes]) => {
+    let cancelled = false
+
+    async function load({ silent = false } = {}) {
+      if (!silent) setLoading(true)
+
+      try {
+        const [statsRes, applicationsRes] = await Promise.all([
+          fetch('/api/admin/stats', { cache: 'no-store' }).then(r => r.json()),
+          fetch('/api/admin/owner-applications', { cache: 'no-store' }).then(r => r.json()),
+        ])
+
+        if (cancelled) return
+
         if (statsRes.error) {
           setError(statsRes.error.message)
           return
@@ -48,11 +56,37 @@ export default function AdminDashboardPage() {
           return
         }
 
+        setError(null)
         setStats(statsRes.data)
         setApplications(applicationsRes.data ?? [])
-      })
-      .catch(() => setError('Не удалось загрузить статистику'))
-      .finally(() => setLoading(false))
+      } catch {
+        if (!cancelled) setError('Не удалось загрузить статистику')
+      } finally {
+        if (!cancelled && !silent) setLoading(false)
+      }
+    }
+
+    function handleRefreshSignal() {
+      if (document.visibilityState === 'visible') {
+        void load({ silent: true })
+      }
+    }
+
+    void load()
+
+    const intervalId = window.setInterval(() => {
+      void load({ silent: true })
+    }, 15000)
+
+    window.addEventListener('focus', handleRefreshSignal)
+    document.addEventListener('visibilitychange', handleRefreshSignal)
+
+    return () => {
+      cancelled = true
+      window.clearInterval(intervalId)
+      window.removeEventListener('focus', handleRefreshSignal)
+      document.removeEventListener('visibilitychange', handleRefreshSignal)
+    }
   }, [])
 
   async function updateApplicationStatus(id: string, status: OwnerApplicationStatus) {
