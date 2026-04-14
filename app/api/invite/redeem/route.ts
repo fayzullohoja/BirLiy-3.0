@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { requireAuth } from '@/lib/auth/apiGuard'
 import { err, ok } from '@/lib/utils'
 import { isValidInviteCode, normalizeInviteCode } from '@/lib/inviteCodes'
+import { resolveInviteCodeByCode } from '@/lib/inviteCodeResolver'
 import type { ShopUserRole } from '@/lib/types'
 
 export async function POST(req: NextRequest) {
@@ -16,24 +17,21 @@ export async function POST(req: NextRequest) {
   }
 
   const supabase = createServiceClient()
-  const { data: inviteCode, error: inviteError } = await supabase
-    .from('shop_invite_codes')
-    .select(`
-      id, shop_id, role, code, is_active,
-      shop:shops (id, name, is_active)
-    `)
-    .eq('code', code)
-    .eq('is_active', true)
-    .single()
+  const { inviteCode, error: inviteError, source } = await resolveInviteCodeByCode(code)
 
-  if (inviteError || !inviteCode) {
+  if (inviteError) {
+    console.error(`[invite/redeem ${source}]`, inviteError)
+    return NextResponse.json(err('DB_ERROR', 'Не удалось проверить код приглашения'), { status: 500 })
+  }
+
+  if (!inviteCode) {
     return NextResponse.json(
       err('INVALID_CODE', 'Неверный код приглашения. Проверьте и попробуйте снова.'),
       { status: 404 },
     )
   }
 
-  const shop = Array.isArray(inviteCode.shop) ? inviteCode.shop[0] : inviteCode.shop
+  const shop = inviteCode.shop
   if (!shop?.is_active) {
     return NextResponse.json(
       err('SHOP_INACTIVE', 'Это заведение неактивно. Обратитесь к владельцу.'),
