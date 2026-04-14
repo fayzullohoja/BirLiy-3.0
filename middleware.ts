@@ -32,6 +32,9 @@ const PUBLIC_PATHS = ['/', '/not-connected', '/subscription-blocked', '/dashboar
 /** API routes that skip session verification (handled internally) */
 const PUBLIC_API_PREFIXES = ['/api/auth', '/api/version', '/_next', '/favicon']
 
+/** Authenticated users without shop access still need these onboarding APIs */
+const NO_SHOP_ALLOWED_API_PREFIXES = ['/api/invite/redeem', '/api/invite/join', '/api/owner-applications']
+
 /** Role → allowed path prefix */
 const ROLE_HOME: Record<UserRole, string> = {
   unauthorized: '/not-connected',
@@ -87,6 +90,16 @@ export async function middleware(req: NextRequest) {
   // ── Shop access gate ────────────────────────────────────────────────────────
 
   if (role !== 'super_admin' && shopIds.length === 0) {
+    if (NO_SHOP_ALLOWED_API_PREFIXES.some((p) => pathname.startsWith(p))) {
+      const requestHeaders = new Headers(req.headers)
+      requestHeaders.set('x-user-id', userId)
+      requestHeaders.set('x-user-role', role)
+      requestHeaders.set('x-shop-ids', JSON.stringify(shopIds))
+      requestHeaders.set('x-primary-shop-id', primaryShopId ?? '')
+
+      return NextResponse.next({ request: { headers: requestHeaders } })
+    }
+
     if (pathname !== '/not-connected') {
       return NextResponse.redirect(new URL('/not-connected', req.url))
     }
