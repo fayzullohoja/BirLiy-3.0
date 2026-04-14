@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { err, ok } from '@/lib/utils'
 import { getSessionUser, getUserContext } from '@/lib/auth/getUser'
 import { signSession } from '@/lib/auth/session'
@@ -17,7 +17,7 @@ const MAGIC_TTL_SEC = 60 * 10 // 10 minutes
  *           → Telegram.WebApp.openLink(url)
  *           → /dashboard/auth validates token, sets session cookie, redirects
  */
-export async function POST() {
+export async function POST(req: NextRequest) {
   // Use getSessionUser (reads cookie directly) — middleware skips header injection
   // for /api/auth/* routes, so requireAuth() would always return 401 here.
   const user = await getSessionUser()
@@ -46,9 +46,13 @@ export async function POST() {
       ttlSec:         MAGIC_TTL_SEC,
     })
 
-    const baseUrl =
-      process.env.NEXT_PUBLIC_APP_URL ??
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000')
+    const forwardedProto = req.headers.get('x-forwarded-proto')
+    const forwardedHost = req.headers.get('x-forwarded-host')
+    const requestOrigin =
+      forwardedProto && forwardedHost
+        ? `${forwardedProto}://${forwardedHost}`
+        : req.nextUrl.origin
+    const baseUrl = requestOrigin || 'http://localhost:3000'
 
     return NextResponse.json(ok({
       url:        `${baseUrl}/dashboard/auth?token=${token}`,
