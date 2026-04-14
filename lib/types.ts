@@ -1,5 +1,6 @@
 // ─── Enums / Literal Types ────────────────────────────────────────────────────
 
+export type AppLanguage   = 'ru' | 'uz'
 export type UserRole      = 'super_admin' | 'unauthorized' | 'owner' | 'manager' | 'waiter' | 'kitchen'
 export type ShopUserRole  = 'owner' | 'manager' | 'waiter' | 'kitchen'
 export type TableStatus   = 'free' | 'occupied' | 'reserved' | 'bill_requested'
@@ -20,6 +21,7 @@ export interface AppUser {
   name:        string
   username:    string | null
   role:        UserRole
+  preferred_language?: AppLanguage | null
   created_at:  string
   updated_at:  string
 }

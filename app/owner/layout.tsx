@@ -4,29 +4,7 @@ import { usePathname } from 'next/navigation'
 import BottomNav from '@/components/layout/BottomNav'
 import type { NavItem } from '@/components/layout/BottomNav'
 import { OwnerSessionProvider } from './_context/OwnerSessionContext'
-
-const NAV_ITEMS: NavItem[] = [
-  {
-    href:  '/owner',
-    label: 'Итоги',
-    icon:  <ChartIcon />,
-  },
-  {
-    href:  '/owner/orders',
-    label: 'Заказы',
-    icon:  <OrderIcon />,
-  },
-  {
-    href:  '/owner/tables',
-    label: 'Столы',
-    icon:  <TableIcon />,
-  },
-  {
-    href:  '/owner/menu',
-    label: 'Меню',
-    icon:  <MenuIcon />,
-  },
-]
+import { useAppLanguage } from '@/lib/useAppLanguage'
 
 export default function OwnerLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -38,13 +16,41 @@ export default function OwnerLayout({ children }: { children: React.ReactNode })
 
 function OwnerLayoutInner({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
+  const { copy } = useAppLanguage()
+  const navItems: NavItem[] = [
+    {
+      href:  '/owner',
+      label: copy.nav.analytics,
+      icon:  <ChartIcon />,
+    },
+    {
+      href:  '/owner/orders',
+      label: copy.nav.orders,
+      icon:  <OrderIcon />,
+    },
+    {
+      href:  '/owner/tables',
+      label: copy.nav.tables,
+      icon:  <TableIcon />,
+    },
+    {
+      href:  '/owner/menu',
+      label: copy.nav.menu,
+      icon:  <MenuIcon />,
+    },
+    {
+      href:  '/owner/profile',
+      label: copy.nav.profile,
+      icon:  <ProfileIcon />,
+    },
+  ]
   // Hide nav on order detail pages
   const hideNav  = pathname.startsWith('/owner/orders/')
 
   return (
     <div className="min-h-screen bg-surface-muted">
       {children}
-      {!hideNav && <BottomNav items={NAV_ITEMS} />}
+      {!hideNav && <BottomNav items={navItems} />}
     </div>
   )
 }
@@ -84,6 +90,15 @@ function MenuIcon() {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M3 6h18M3 12h18M3 18h18" />
+    </svg>
+  )
+}
+
+function ProfileIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20 21a8 8 0 0 0-16 0" />
+      <circle cx="12" cy="8" r="4" />
     </svg>
   )
 }
