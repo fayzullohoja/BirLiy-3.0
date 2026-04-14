@@ -123,8 +123,8 @@ function HeaderDashboardButton({ href }: { href: string }) {
       const url = json.data?.url ?? new URL(href, window.location.origin).toString()
       const telegram = getTelegramWebApp()
 
-      if (telegram?.openLink) {
-        telegram.openLink(url)
+      if (telegram) {
+        window.location.assign(url)
         return
       }
 

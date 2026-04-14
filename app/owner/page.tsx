@@ -54,7 +54,7 @@ export default function OwnerDashboardPage() {
       if (url) {
         const twa = getTelegramWebApp()
         if (twa) {
-          twa.openLink(url)
+          window.location.assign(url)
         } else {
           // Fallback for local dev — open in new tab
           window.open(url, '_blank')
