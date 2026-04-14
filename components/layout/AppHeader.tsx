@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import Button from '@/components/ui/Button'
+import { toast } from '@/components/ui/Toast'
 import { signOutCurrentSession } from '@/lib/auth/clientAuth'
 import { getTelegramWebApp } from '@/lib/telegram/webapp'
 
@@ -104,18 +105,35 @@ export function HeaderIconButton({ children, label, className, ...props }: Heade
 }
 
 function HeaderDashboardButton({ href }: { href: string }) {
-  function handleOpenDashboard() {
-    if (typeof window === 'undefined') return
+  const [opening, setOpening] = useState(false)
 
-    const url = new URL(href, window.location.origin).toString()
-    const telegram = getTelegramWebApp()
+  async function handleOpenDashboard() {
+    if (typeof window === 'undefined' || opening) return
 
-    if (telegram?.openLink) {
-      telegram.openLink(url)
-      return
+    setOpening(true)
+    try {
+      const res = await fetch('/api/auth/magic', { method: 'POST' })
+      const json = await res.json()
+
+      if (json.error) {
+        toast.error(json.error.message ?? 'Не удалось открыть веб-панель')
+        return
+      }
+
+      const url = json.data?.url ?? new URL(href, window.location.origin).toString()
+      const telegram = getTelegramWebApp()
+
+      if (telegram?.openLink) {
+        telegram.openLink(url)
+        return
+      }
+
+      window.open(url, '_blank', 'noopener,noreferrer')
+    } catch {
+      toast.error('Не удалось открыть веб-панель')
+    } finally {
+      setOpening(false)
     }
-
-    window.open(url, '_blank', 'noopener,noreferrer')
   }
 
   return (
@@ -124,15 +142,17 @@ function HeaderDashboardButton({ href }: { href: string }) {
       aria-label="Открыть веб-дешборд"
       title="Открыть веб-дешборд"
       onClick={handleOpenDashboard}
+      disabled={opening}
       className={cn(
         'h-9 px-3 flex items-center justify-center',
         'rounded-xl border border-brand-200 bg-brand-50',
         'text-[11px] font-bold tracking-[0.12em] text-brand-700 uppercase',
         'hover:bg-brand-100 active:bg-brand-100',
+        'disabled:opacity-60 disabled:cursor-not-allowed',
         'transition-colors duration-150',
       )}
     >
-      Web
+      {opening ? '...' : 'Web'}
     </button>
   )
 }
