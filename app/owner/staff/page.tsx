@@ -385,27 +385,46 @@ function InviteCodeCard({
   loading: boolean
   onRegenerate: () => void
 }) {
+  const [copied, setCopied] = useState(false)
+
+  function handleCopy() {
+    if (!code?.code) return
+    navigator.clipboard.writeText(code.code).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    }).catch(() => toast.error('Не удалось скопировать'))
+  }
+
   return (
     <div className="rounded-2xl border border-surface-border bg-surface px-4 py-4">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-ink">{SHOP_ROLE_LABELS[role]}</p>
           <p className="mt-1 text-sm text-ink-secondary">
-            {code ? 'Действующий код для подключения сотрудников' : 'Код пока не создан'}
+            {code ? 'Поделитесь кодом с сотрудником' : 'Код пока не создан'}
           </p>
         </div>
         <Badge variant={ROLE_BADGE_VARIANTS[role]}>{SHOP_ROLE_LABELS[role]}</Badge>
       </div>
 
-      <div className="mt-4 flex items-center justify-between gap-3">
-        <div className="rounded-2xl border border-dashed border-brand-300 bg-brand-50 px-4 py-3">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-muted">Код</p>
+      <div className="mt-4 flex items-center gap-3">
+        {/* Code display */}
+        <button
+          onClick={handleCopy}
+          disabled={!code?.code}
+          className="flex-1 rounded-2xl border border-dashed border-brand-300 bg-brand-50 px-4 py-3 text-left active:scale-95 transition-transform disabled:opacity-40 disabled:cursor-default"
+        >
+          <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-ink-muted">
+            {copied ? '✓ Скопировано!' : 'Нажмите чтобы скопировать'}
+          </p>
           <p className="mt-1 text-2xl font-bold tracking-[0.24em] text-brand-700">
             {code?.code ?? '--------'}
           </p>
-        </div>
+        </button>
+
+        {/* Generate / rotate */}
         <Button size="sm" loading={loading} onClick={onRegenerate}>
-          {code ? 'Перевыпустить' : 'Создать'}
+          {code ? 'Обновить' : 'Создать'}
         </Button>
       </div>
     </div>

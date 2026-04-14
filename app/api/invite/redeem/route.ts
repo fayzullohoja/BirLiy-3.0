@@ -22,7 +22,12 @@ export async function POST(req: NextRequest) {
 
   if (inviteError) {
     console.error(`[invite/redeem ${source}]`, inviteError)
-    return NextResponse.json(err('DB_ERROR', 'Не удалось проверить код приглашения'), { status: 500 })
+    // Surface DB error details to help diagnose RLS / table issues
+    const detail = (inviteError as { message?: string })?.message ?? String(inviteError)
+    return NextResponse.json(
+      err('DB_ERROR', `Ошибка проверки кода: ${detail}`),
+      { status: 500 },
+    )
   }
 
   if (!inviteCode) {
