@@ -3,6 +3,7 @@ import { createServiceClient } from '@/lib/supabase/server'
 import { requireShopAdminAccess } from '@/lib/auth/apiGuard'
 import { err, ok } from '@/lib/utils'
 import { canAssignShopRole, canRemoveStaffRole, isManagementShopRole } from '@/lib/roles'
+import { setNonSuperAdminUserRole, syncUserRoleFromMemberships } from '@/lib/userRoleSync'
 
 /**
  * POST /api/admin/shops/[id]/members
@@ -100,6 +101,12 @@ export async function POST(
     return NextResponse.json(err('DB_ERROR', 'Failed to assign member'), { status: 500 })
   }
 
+  const { error: roleSyncError } = await setNonSuperAdminUserRole(user_id, role)
+  if (roleSyncError) {
+    console.error('[admin/shops/[id]/members POST sync role]', roleSyncError)
+    return NextResponse.json(err('DB_ERROR', 'Failed to sync user role'), { status: 500 })
+  }
+
   return NextResponse.json(ok(data), { status: 201 })
 }
 
@@ -167,6 +174,12 @@ export async function DELETE(
   if (error) {
     console.error('[admin/shops/[id]/members DELETE]', error)
     return NextResponse.json(err('DB_ERROR', 'Failed to remove member'), { status: 500 })
+  }
+
+  const { error: roleSyncError } = await syncUserRoleFromMemberships(userId)
+  if (roleSyncError) {
+    console.error('[admin/shops/[id]/members DELETE sync role]', roleSyncError)
+    return NextResponse.json(err('DB_ERROR', 'Failed to sync user role'), { status: 500 })
   }
 
   return new NextResponse(null, { status: 204 })

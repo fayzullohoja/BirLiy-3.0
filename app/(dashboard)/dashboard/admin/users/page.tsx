@@ -28,10 +28,11 @@ interface AdminUserRow {
   }>
 }
 
-const ROLE_FILTERS: Array<'all' | UserRole> = ['all', 'super_admin', 'owner', 'manager', 'waiter', 'kitchen']
+const ROLE_FILTERS: Array<'all' | UserRole> = ['all', 'super_admin', 'unauthorized', 'owner', 'manager', 'waiter', 'kitchen']
 
 const ROLE_LABELS: Record<UserRole, string> = {
   super_admin: 'Супер-админ',
+  unauthorized: 'Не авторизован',
   owner: 'Владелец',
   manager: 'Менеджер',
   waiter: 'Официант',
@@ -40,6 +41,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
 
 const ROLE_VARIANTS: Record<UserRole, 'danger' | 'default' | 'info' | 'warning' | 'neutral'> = {
   super_admin: 'danger',
+  unauthorized: 'neutral',
   owner: 'default',
   manager: 'info',
   waiter: 'info',
@@ -93,6 +95,7 @@ export default function DashboardAdminUsersPage() {
   const counts = useMemo(() => ({
     all: users.length,
     super_admin: users.filter((user) => user.role === 'super_admin').length,
+    unauthorized: users.filter((user) => user.role === 'unauthorized').length,
     owner: users.filter((user) => user.role === 'owner').length,
     manager: users.filter((user) => user.role === 'manager').length,
     waiter: users.filter((user) => user.role === 'waiter').length,

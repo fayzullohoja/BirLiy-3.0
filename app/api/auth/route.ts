@@ -24,6 +24,7 @@ import { getUserContext } from '@/lib/auth/getUser'
 import { ok, err } from '@/lib/utils'
 import type { AuthResponse, UserRole } from '@/lib/types'
 import { inferShopRoleFromUserRole, normalizePlatformRole } from '@/lib/roles'
+import { UNAUTHORIZED_USER_ROLE } from '@/lib/userRoleSync'
 
 const IS_DEV = process.env.NODE_ENV === 'development'
 const DEV_DEMO_SHOP_ID = '00000000-0000-0000-0000-000000000001'
@@ -115,13 +116,10 @@ async function upsertUserAndRespond(opts: {
 
   if (existingUser) {
     userId = existingUser.id
-    const nextPlatformRole = existingUser.role === 'super_admin'
-      ? 'super_admin'
-      : normalizePlatformRole('waiter')
     // Keep name in sync silently
     await adminClient
       .from('users')
-      .update({ name: fullName, username: username ?? null, role: nextPlatformRole })
+      .update({ name: fullName, username: username ?? null })
       .eq('id', userId)
   } else {
     // 2. Create Supabase auth user (email_confirm bypasses email verification)
@@ -155,7 +153,7 @@ async function upsertUserAndRespond(opts: {
       telegram_id: telegramId,
       name:        fullName,
       username:    username ?? null,
-      role:        normalizePlatformRole('waiter'),
+      role:        UNAUTHORIZED_USER_ROLE,
     })
 
     if (insertError && insertError.code !== '23505') {
@@ -202,7 +200,7 @@ async function upsertUserAndRespond(opts: {
 // ─── Dev auth helper ──────────────────────────────────────────────────────────
 
 async function handleDevAuth(devRole: string, telegramId: number) {
-  if (!['waiter', 'kitchen', 'manager', 'owner', 'super_admin'].includes(devRole)) {
+  if (!['waiter', 'kitchen', 'manager', 'owner', 'super_admin', 'unauthorized'].includes(devRole)) {
     return NextResponse.json(err('BAD_DEV_ROLE', 'Invalid dev_role'), { status: 400 })
   }
 
@@ -250,8 +248,8 @@ async function handleDevAuth(devRole: string, telegramId: number) {
     })
   }
 
-  if (role !== 'super_admin') {
-    const shopRole = inferShopRoleFromUserRole(role as Exclude<UserRole, 'super_admin'>)
+  if (role !== 'super_admin' && role !== 'unauthorized') {
+    const shopRole = inferShopRoleFromUserRole(role)
     const { error: membershipError } = await adminClient
       .from('shop_users')
       .upsert(

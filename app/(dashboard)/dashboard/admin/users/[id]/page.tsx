@@ -47,6 +47,7 @@ const DEMO_SHOP_ID = '00000000-0000-0000-0000-000000000001'
 
 const ROLE_LABELS: Record<UserRole, string> = {
   super_admin: 'Супер-админ',
+  unauthorized: 'Не авторизован',
   owner: 'Владелец',
   manager: 'Менеджер',
   waiter: 'Официант',
@@ -55,6 +56,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
 
 const ROLE_VARIANTS: Record<UserRole, 'danger' | 'default' | 'info' | 'warning' | 'neutral'> = {
   super_admin: 'danger',
+  unauthorized: 'neutral',
   owner: 'default',
   manager: 'info',
   waiter: 'info',
@@ -71,7 +73,7 @@ export default function DashboardAdminUserDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const [role, setRole] = useState<UserRole>('waiter')
+  const [role, setRole] = useState<UserRole>('unauthorized')
   const [shopId, setShopId] = useState('')
   const [shopRole, setShopRole] = useState<ShopUserRole>('waiter')
   const [saving, setSaving] = useState(false)
@@ -112,7 +114,7 @@ export default function DashboardAdminUserDetailPage() {
         setRole(nextUser.role)
 
         const primaryMembership = nextUser.shops?.[0] ?? null
-        const defaultShopId = primaryMembership?.shop_id
+      const defaultShopId = primaryMembership?.shop_id
           || nextShops.find((shop) => shop.id === DEMO_SHOP_ID)?.id
           || nextShops[0]?.id
           || ''
@@ -135,7 +137,7 @@ export default function DashboardAdminUserDetailPage() {
   const memberships = useMemo(() => user?.shops ?? [], [user?.shops])
 
   async function handleSave() {
-    if (role !== 'super_admin' && !shopId) {
+    if (role !== 'super_admin' && role !== 'unauthorized' && !shopId) {
       toast.error('Выберите заведение для назначения')
       return
     }
@@ -147,8 +149,8 @@ export default function DashboardAdminUserDetailPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           role,
-          shop_id: role === 'super_admin' ? null : shopId,
-          shop_role: role === 'super_admin' ? null : shopRole,
+          shop_id: role === 'super_admin' || role === 'unauthorized' ? null : shopId,
+          shop_role: role === 'super_admin' || role === 'unauthorized' ? null : shopRole,
         }),
       }).then((response) => response.json())
 
@@ -236,7 +238,7 @@ export default function DashboardAdminUserDetailPage() {
               onChange={(value) => {
                 const nextRole = value as UserRole
                 setRole(nextRole)
-                if (nextRole !== 'super_admin') {
+                if (nextRole !== 'super_admin' && nextRole !== 'unauthorized') {
                   setShopRole(inferShopRole(nextRole))
                   if (!shopId) {
                     setShopId(
@@ -250,13 +252,14 @@ export default function DashboardAdminUserDetailPage() {
               }}
             >
               <option value="super_admin">Супер-админ</option>
+              <option value="unauthorized">Не авторизован</option>
               <option value="owner">Владелец</option>
               <option value="manager">Менеджер</option>
               <option value="waiter">Официант</option>
               <option value="kitchen">Кухня</option>
             </FormField>
 
-            {role !== 'super_admin' && (
+            {role !== 'super_admin' && role !== 'unauthorized' && (
               <>
                 <FormField
                   as="select"

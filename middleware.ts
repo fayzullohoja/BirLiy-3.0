@@ -34,6 +34,7 @@ const PUBLIC_API_PREFIXES = ['/api/auth', '/api/version', '/_next', '/favicon']
 
 /** Role → allowed path prefix */
 const ROLE_HOME: Record<UserRole, string> = {
+  unauthorized: '/not-connected',
   waiter:      '/waiter',
   kitchen:     '/kitchen',
   manager:     '/owner',

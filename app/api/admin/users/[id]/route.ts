@@ -4,8 +4,9 @@ import { requireSuperAdmin } from '@/lib/auth/apiGuard'
 import { err, ok } from '@/lib/utils'
 import { mapAdminUser, type AdminUserRecord } from '@/lib/admin/userUtils'
 import { inferShopRoleFromUserRole, normalizePlatformRole } from '@/lib/roles'
+import { syncUserRoleFromMemberships, UNAUTHORIZED_USER_ROLE } from '@/lib/userRoleSync'
 
-const VALID_ROLES = ['super_admin', 'owner', 'manager', 'waiter', 'kitchen'] as const
+const VALID_ROLES = ['super_admin', 'unauthorized', 'owner', 'manager', 'waiter', 'kitchen'] as const
 const VALID_SHOP_ROLES = ['owner', 'manager', 'waiter', 'kitchen'] as const
 const DEFAULT_DEMO_SHOP_ID = '00000000-0000-0000-0000-000000000001'
 
@@ -53,7 +54,7 @@ export async function GET(
  * PATCH /api/admin/users/[id]
  * Update a user's platform role and optionally attach them to a shop.
  * Body: {
- *   role: 'super_admin' | 'owner' | 'manager' | 'waiter' | 'kitchen',
+ *   role: 'super_admin' | 'unauthorized' | 'owner' | 'manager' | 'waiter' | 'kitchen',
  *   shop_id?: string,
  *   shop_role?: 'owner' | 'manager' | 'waiter' | 'kitchen',
  * }
@@ -99,9 +100,11 @@ export async function PATCH(
   const shopRole =
     body.shop_role && VALID_SHOP_ROLES.includes(body.shop_role as (typeof VALID_SHOP_ROLES)[number])
       ? body.shop_role as (typeof VALID_SHOP_ROLES)[number]
-      : inferShopRoleFromUserRole(role === 'super_admin' ? 'waiter' : role)
+      : role === 'super_admin' || role === 'unauthorized'
+        ? 'waiter'
+        : inferShopRoleFromUserRole(role)
 
-  if (role !== 'super_admin' && !shopId) {
+  if (role !== 'super_admin' && role !== 'unauthorized' && !shopId) {
     const { data: demoShop } = await supabase
       .from('shops')
       .select('id')
@@ -122,14 +125,14 @@ export async function PATCH(
     }
   }
 
-  if (role !== 'super_admin' && !shopId) {
+  if (role !== 'super_admin' && role !== 'unauthorized' && !shopId) {
     return NextResponse.json(
       err('VALIDATION', 'shop_id is required for owner/manager/waiter/kitchen'),
       { status: 400 },
     )
   }
 
-  const nextPlatformRole = normalizePlatformRole(role)
+  const nextPlatformRole = role === 'unauthorized' ? UNAUTHORIZED_USER_ROLE : normalizePlatformRole(role)
   const { error: updateError } = await supabase
     .from('users')
     .update({ role: nextPlatformRole })
@@ -140,7 +143,17 @@ export async function PATCH(
     return NextResponse.json(err('DB_ERROR', 'Failed to update user role'), { status: 500 })
   }
 
-  if (role !== 'super_admin') {
+  if (role === 'unauthorized') {
+    const { error: deleteMembershipsError } = await supabase
+      .from('shop_users')
+      .delete()
+      .eq('user_id', id)
+
+    if (deleteMembershipsError) {
+      console.error('[admin/users/[id] PATCH delete memberships]', deleteMembershipsError)
+      return NextResponse.json(err('DB_ERROR', 'Failed to clear user memberships'), { status: 500 })
+    }
+  } else if (role !== 'super_admin') {
     const { data: existingMembership, error: membershipFetchError } = await supabase
       .from('shop_users')
       .select('id')
@@ -177,6 +190,14 @@ export async function PATCH(
         console.error('[admin/users/[id] PATCH insert membership]', membershipInsertError)
         return NextResponse.json(err('DB_ERROR', 'Failed to assign user to shop'), { status: 500 })
       }
+    }
+  }
+
+  if (role !== 'super_admin') {
+    const { error: syncError } = await syncUserRoleFromMemberships(id, role === 'unauthorized' ? UNAUTHORIZED_USER_ROLE : role)
+    if (syncError) {
+      console.error('[admin/users/[id] PATCH sync role]', syncError)
+      return NextResponse.json(err('DB_ERROR', 'Failed to sync user role'), { status: 500 })
     }
   }
 

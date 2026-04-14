@@ -5,6 +5,7 @@ import { ok, err } from '@/lib/utils'
 import { isValidInviteCode, normalizeInviteCode } from '@/lib/inviteCodes'
 import { resolveInviteCodeByCode } from '@/lib/inviteCodeResolver'
 import type { ShopUserRole } from '@/lib/types'
+import { setNonSuperAdminUserRole } from '@/lib/userRoleSync'
 
 /**
  * Legacy compatibility route.
@@ -108,6 +109,12 @@ export async function POST(req: NextRequest) {
         err('DB_ERROR', 'Не удалось присоединиться. Попробуйте снова.'),
         { status: 500 },
       )
+    }
+
+    const { error: userRoleError } = await setNonSuperAdminUserRole(userId, inviteCode.role)
+    if (userRoleError) {
+      console.error('[invite/join sync user role]', userRoleError)
+      return NextResponse.json(err('DB_ERROR', 'Failed to update user role'), { status: 500 })
     }
 
     return NextResponse.json(ok({

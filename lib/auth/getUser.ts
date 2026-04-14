@@ -12,6 +12,7 @@ import { SESSION_COOKIE } from './session'
 import { createServiceClient } from '@/lib/supabase/server'
 import type { RequestUser, UserContext, ShopAccessEntry, UserRole } from '@/lib/types'
 import { normalizePlatformRole } from '@/lib/roles'
+import { UNAUTHORIZED_USER_ROLE } from '@/lib/userRoleSync'
 
 // ─── Request-level user (set by middleware via headers) ───────────────────────
 
@@ -140,7 +141,7 @@ export async function getUserContext(userId: string): Promise<UserContext> {
   const appRole: UserRole =
     userRes.data.role === 'super_admin'
       ? 'super_admin'
-      : primaryAccess?.role ?? 'waiter'
+      : primaryAccess?.role ?? UNAUTHORIZED_USER_ROLE
 
   const normalizedUser = {
     ...userRes.data,

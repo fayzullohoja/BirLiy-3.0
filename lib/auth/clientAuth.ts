@@ -75,6 +75,8 @@ export function resolveAuthDestination(data: AuthResponse): string {
 
   return data.role === 'super_admin'
     ? '/admin'
+    : data.role === 'unauthorized'
+      ? '/not-connected'
     : data.role === 'kitchen'
       ? '/kitchen'
     : data.role === 'owner' || data.role === 'manager'

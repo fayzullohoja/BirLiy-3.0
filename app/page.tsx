@@ -44,7 +44,7 @@ export default function RootPage() {
 
       let body: Record<string, unknown>
 
-      if (devRole && ['waiter', 'kitchen', 'manager', 'owner', 'super_admin', 'admin'].includes(devRole)) {
+      if (devRole && ['waiter', 'kitchen', 'manager', 'owner', 'super_admin', 'unauthorized', 'admin'].includes(devRole)) {
         // Dev bypass — map 'admin' alias
         const mappedRole = devRole === 'admin' ? 'super_admin' : devRole
         body = {

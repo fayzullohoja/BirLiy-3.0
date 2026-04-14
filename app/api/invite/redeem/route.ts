@@ -5,6 +5,7 @@ import { err, ok } from '@/lib/utils'
 import { isValidInviteCode, normalizeInviteCode } from '@/lib/inviteCodes'
 import { resolveInviteCodeByCode } from '@/lib/inviteCodeResolver'
 import type { ShopUserRole } from '@/lib/types'
+import { setNonSuperAdminUserRole } from '@/lib/userRoleSync'
 
 export async function POST(req: NextRequest) {
   const authResult = await requireAuth()
@@ -101,6 +102,15 @@ export async function POST(req: NextRequest) {
     console.error('[invite/redeem insert]', insertError)
     return NextResponse.json(
       err('DB_ERROR', 'Не удалось присоединиться к заведению. Попробуйте снова.'),
+      { status: 500 },
+    )
+  }
+
+  const { error: userRoleError } = await setNonSuperAdminUserRole(userId, inviteCode.role)
+  if (userRoleError) {
+    console.error('[invite/redeem sync user role]', userRoleError)
+    return NextResponse.json(
+      err('DB_ERROR', 'Не удалось обновить роль пользователя. Попробуйте снова.'),
       { status: 500 },
     )
   }

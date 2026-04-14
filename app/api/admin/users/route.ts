@@ -8,7 +8,7 @@ import { mapAdminUser, type AdminUserRecord } from '@/lib/admin/userUtils'
  * GET /api/admin/users?role=waiter&search=text
  * List all platform users with their shop memberships.
  * Optional query params:
- *   role   — filter by user_role (super_admin | owner | manager | waiter | kitchen)
+ *   role   — filter by user_role (super_admin | unauthorized | owner | manager | waiter | kitchen)
  *   search — partial match on name or username (case-insensitive)
  * Requires: super_admin.
  * Owner dashboard may also call this endpoint with ?shop_id=... to search

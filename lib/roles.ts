@@ -12,6 +12,7 @@ export const SHOP_ROLE_LABELS: Record<ShopUserRole, string> = {
 
 export const USER_ROLE_LABELS: Record<UserRole, string> = {
   super_admin: 'Супер-Админ',
+  unauthorized: 'Не авторизован',
   owner: 'Владелец',
   manager: 'Менеджер',
   waiter: 'Официант',
@@ -31,7 +32,7 @@ export function isManagementShopRole(
 }
 
 export function inferShopRoleFromUserRole(
-  role: Exclude<UserRole, 'super_admin'>,
+  role: Exclude<UserRole, 'super_admin' | 'unauthorized'>,
 ): ShopUserRole {
   if (role === 'owner' || role === 'manager' || role === 'waiter' || role === 'kitchen') {
     return role
@@ -41,7 +42,7 @@ export function inferShopRoleFromUserRole(
 }
 
 export function normalizePlatformRole(role: UserRole): UserRole {
-  return role === 'super_admin' ? 'super_admin' : 'waiter'
+  return role
 }
 
 export function getAssignableShopRoles(

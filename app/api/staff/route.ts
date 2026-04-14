@@ -4,6 +4,7 @@ import { requireManagementAccess } from '@/lib/auth/apiGuard'
 import { err, ok } from '@/lib/utils'
 import type { ShopUser, ShopUserRole } from '@/lib/types'
 import { canChangeStaffRole, canRemoveStaffRole, isManagementShopRole } from '@/lib/roles'
+import { syncUserRoleFromMemberships, setNonSuperAdminUserRole } from '@/lib/userRoleSync'
 
 /**
  * GET /api/staff?shop_id=xxx
@@ -104,6 +105,12 @@ export async function DELETE(req: NextRequest) {
       return NextResponse.json(err('DB_ERROR', 'Failed to remove staff member'), { status: 500 })
     }
 
+    const { error: roleSyncError } = await syncUserRoleFromMemberships(userId)
+    if (roleSyncError) {
+      console.error('[staff DELETE sync role]', roleSyncError)
+      return NextResponse.json(err('DB_ERROR', 'Failed to sync user role'), { status: 500 })
+    }
+
     return new NextResponse(null, { status: 204 })
   } catch (e) {
     console.error('[staff DELETE] unexpected:', e)
@@ -183,6 +190,12 @@ export async function PATCH(req: NextRequest) {
     if (error) {
       console.error('[staff PATCH update]', error)
       return NextResponse.json(err('DB_ERROR', 'Failed to update staff role'), { status: 500 })
+    }
+
+    const { error: roleSyncError } = await setNonSuperAdminUserRole(userId, nextRole)
+    if (roleSyncError) {
+      console.error('[staff PATCH sync role]', roleSyncError)
+      return NextResponse.json(err('DB_ERROR', 'Failed to sync user role'), { status: 500 })
     }
 
     const normalized: ShopUser = {

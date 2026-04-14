@@ -27,6 +27,7 @@ interface ShopOption {
 
 const ROLE_LABELS: Record<UserRole, string> = {
   super_admin: 'Супер-Админ',
+  unauthorized: 'Не авторизован',
   owner:       'Владелец',
   manager:     'Менеджер',
   kitchen:     'Кухня',
@@ -35,6 +36,7 @@ const ROLE_LABELS: Record<UserRole, string> = {
 
 const ROLE_BADGE: Record<UserRole, 'danger' | 'info' | 'warning' | 'neutral' | 'default'> = {
   super_admin: 'danger',
+  unauthorized: 'neutral',
   owner:       'default',
   manager:     'info',
   kitchen:     'warning',
@@ -44,6 +46,7 @@ const ROLE_BADGE: Record<UserRole, 'danger' | 'info' | 'warning' | 'neutral' | '
 const FILTER_OPTIONS: { value: '' | UserRole; label: string }[] = [
   { value: '',            label: 'Все' },
   { value: 'super_admin', label: 'Супер-Админ' },
+  { value: 'unauthorized', label: 'Не авторизован' },
   { value: 'owner',       label: 'Владельцы' },
   { value: 'manager',     label: 'Менеджеры' },
   { value: 'kitchen',     label: 'Кухня' },
@@ -68,7 +71,7 @@ export default function AdminUsersPage() {
 
   // Role-change sheet
   const [editTarget, setEditTarget] = useState<UserRow | null>(null)
-  const [newRole, setNewRole]       = useState<UserRole>('waiter')
+  const [newRole, setNewRole]       = useState<UserRole>('unauthorized')
   const [selectedShopId, setSelectedShopId] = useState('')
   const [saving, setSaving]         = useState(false)
   const [saveError, setSaveError]   = useState<string | null>(null)
@@ -132,7 +135,7 @@ export default function AdminUsersPage() {
 
   async function handleSaveRole() {
     if (!editTarget) return
-    if (newRole !== 'super_admin' && !selectedShopId) {
+    if (newRole !== 'super_admin' && newRole !== 'unauthorized' && !selectedShopId) {
       setSaveError('Выберите заведение для назначения')
       return
     }
@@ -144,7 +147,7 @@ export default function AdminUsersPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           role: newRole,
-          shop_id: newRole === 'super_admin' ? null : selectedShopId,
+          shop_id: newRole === 'super_admin' || newRole === 'unauthorized' ? null : selectedShopId,
                   shop_role:
                     newRole === 'owner'
                       ? 'owner'
@@ -253,12 +256,12 @@ export default function AdminUsersPage() {
             </p>
           )}
           <div className="flex flex-col gap-2">
-            {(['waiter', 'kitchen', 'manager', 'owner', 'super_admin'] as UserRole[]).map(r => (
+            {(['unauthorized', 'waiter', 'kitchen', 'manager', 'owner', 'super_admin'] as UserRole[]).map(r => (
               <button
                 key={r}
                 onClick={() => {
                   setNewRole(r)
-                  if (r !== 'super_admin' && !selectedShopId && editTarget) {
+                  if (r !== 'super_admin' && r !== 'unauthorized' && !selectedShopId && editTarget) {
                     setSelectedShopId(getDefaultShopId(editTarget))
                   }
                 }}
@@ -272,7 +275,7 @@ export default function AdminUsersPage() {
               </button>
             ))}
           </div>
-          {newRole !== 'super_admin' && (
+          {newRole !== 'super_admin' && newRole !== 'unauthorized' && (
             <>
               <FormField
                 label="Заведение"
@@ -317,7 +320,7 @@ export default function AdminUsersPage() {
           <Button
             fullWidth
             loading={saving}
-            disabled={saving || (newRole !== 'super_admin' && !selectedShopId)}
+            disabled={saving || ((newRole !== 'super_admin' && newRole !== 'unauthorized') && !selectedShopId)}
             onClick={handleSaveRole}
           >
             Сохранить
