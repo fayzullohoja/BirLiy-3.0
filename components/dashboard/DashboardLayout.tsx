@@ -58,6 +58,20 @@ export default function DashboardLayout({
         <main className="px-4 py-6 md:px-6">
           {children}
         </main>
+        <footer className="px-4 py-4 md:px-6 border-t border-surface-border mt-2">
+          <div className="flex items-center gap-3 text-xs text-ink-muted">
+            <a
+              href="/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-ink-secondary underline underline-offset-2 transition-colors"
+            >
+              Политика конфиденциальности
+            </a>
+            <span>·</span>
+            <span>&copy; {new Date().getFullYear()} BirLiy</span>
+          </div>
+        </footer>
       </div>
     </div>
   )

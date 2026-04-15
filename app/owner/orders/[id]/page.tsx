@@ -67,7 +67,17 @@ export default function OwnerOrderDetailPage() {
           </h1>
           <p className="text-xs text-ink-muted">{formatDate(order.created_at)} · {formatTime(order.created_at)}</p>
         </div>
-        <OrderStatusBadge status={order.status} />
+        <div className="flex items-center gap-2 shrink-0">
+          <OrderStatusBadge status={order.status} />
+          <button
+            onClick={() => router.push(`/receipt/${order.id}`)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-surface-muted border border-surface-border text-xs font-semibold text-ink-secondary hover:bg-surface active:scale-95 transition-transform"
+            aria-label="Открыть чек"
+          >
+            <ReceiptIcon />
+            Чек
+          </button>
+        </div>
       </header>
 
       <div className="p-4 flex flex-col gap-4">
@@ -151,4 +161,15 @@ function DetailSkeleton() {
 
 function BackIcon() {
   return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 5l-7 7 7 7" /></svg>
+}
+
+function ReceiptIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 2v20l3-3 3 3 3-3 3 3 3-3V2z" />
+      <line x1="9" y1="9" x2="15" y2="9" />
+      <line x1="9" y1="13" x2="15" y2="13" />
+      <line x1="9" y1="17" x2="12" y2="17" />
+    </svg>
+  )
 }

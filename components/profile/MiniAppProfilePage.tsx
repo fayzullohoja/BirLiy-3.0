@@ -220,12 +220,27 @@ export default function MiniAppProfilePage() {
           </div>
         </Section>
 
-        <Section title={copy.profile.delete_section} className="mt-5 pb-10">
+        <Section title={copy.profile.delete_section} className="mt-5">
           <div className="rounded-3xl border border-red-200 bg-red-50 px-4 py-4 shadow-card-sm">
             <p className="text-sm text-red-700 mb-4">{copy.profile.delete_hint}</p>
             <Button fullWidth variant="danger" disabled={loading} onClick={() => setConfirmOpen(true)}>
               {copy.profile.delete_action}
             </Button>
+          </div>
+        </Section>
+
+        <Section className="mt-3 pb-10">
+          <div className="flex items-center justify-center gap-4 text-xs text-ink-muted">
+            <a
+              href="/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="hover:text-ink-secondary underline underline-offset-2 transition-colors"
+            >
+              Политика конфиденциальности
+            </a>
+            <span>·</span>
+            <span>BirLiy Kassa</span>
           </div>
         </Section>
       </PageContainer>

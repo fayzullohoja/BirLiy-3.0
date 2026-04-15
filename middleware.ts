@@ -27,10 +27,10 @@ import type { UserRole } from '@/lib/types'
 const PROTECTED_PREFIXES = ['/waiter', '/kitchen', '/owner', '/admin']
 
 /** Routes that are always public (no auth needed) */
-const PUBLIC_PATHS = ['/', '/not-connected', '/subscription-blocked', '/dashboard/login', '/dashboard/not-authorized', '/dashboard/auth']
+const PUBLIC_PATHS = ['/', '/not-connected', '/subscription-blocked', '/dashboard/login', '/dashboard/not-authorized', '/dashboard/auth', '/privacy']
 
 /** API routes that skip session verification (handled internally) */
-const PUBLIC_API_PREFIXES = ['/api/auth', '/api/version', '/_next', '/favicon']
+const PUBLIC_API_PREFIXES = ['/api/auth', '/api/version', '/api/public', '/_next', '/favicon']
 
 /** Authenticated users without shop access still need these onboarding APIs */
 const NO_SHOP_ALLOWED_API_PREFIXES = ['/api/invite/redeem', '/api/invite/join', '/api/owner-applications']
@@ -63,6 +63,10 @@ export async function middleware(req: NextRequest) {
   if (!payload) {
     // Allow public pages without a session
     if (PUBLIC_PATHS.includes(pathname)) {
+      return NextResponse.next()
+    }
+    // Allow receipt pages — they handle their own data access
+    if (pathname.startsWith('/receipt/') || pathname === '/receipt') {
       return NextResponse.next()
     }
     if (pathname.startsWith('/dashboard')) {

@@ -107,6 +107,27 @@ export interface Order {
   items?:       OrderItem[]
 }
 
+export interface PublicReceiptOrder {
+  id:           string
+  table_id:     string
+  status:       OrderStatus
+  total_amount: number
+  payment_type: PaymentType | null
+  notes:        string | null
+  created_at:   string
+  updated_at:   string
+  table?:       Pick<Table, 'id' | 'number' | 'name' | 'capacity'> | null
+  waiter?:      Pick<AppUser, 'id' | 'name'> | null
+  items: Array<{
+    id:           string
+    quantity:     number
+    unit_price:   number
+    status:       OrderItemStatus
+    notes:        string | null
+    menu_item?:   Pick<MenuItem, 'id' | 'name'> | null
+  }>
+}
+
 export interface OrderItem {
   id:           string
   order_id:     string

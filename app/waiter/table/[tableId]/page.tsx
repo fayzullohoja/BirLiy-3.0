@@ -214,7 +214,9 @@ export default function TableDetailPage() {
         toast.success(SUCCESS_MESSAGES[status as keyof typeof SUCCESS_MESSAGES]!)
       }
 
-      if (status === 'paid' || status === 'cancelled') {
+      if (status === 'paid') {
+        router.push(`/receipt/${data.order.id}`)
+      } else if (status === 'cancelled') {
         router.push('/waiter')
       } else {
         await fetchData('refresh')

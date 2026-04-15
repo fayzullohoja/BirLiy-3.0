@@ -4,12 +4,14 @@ import { useEffect, useMemo, useState } from 'react'
 import DataTable, { type ColumnDef } from '@/components/dashboard/DataTable'
 import DateRangePicker from '@/components/dashboard/DateRangePicker'
 import FilterBar from '@/components/dashboard/FilterBar'
+import OnboardingWizard from '@/components/dashboard/OnboardingWizard'
 import RevenueChart from '@/components/dashboard/RevenueChart'
 import { SkeletonCard, SkeletonStat } from '@/components/dashboard/Skeleton'
 import { useDashboardSession } from '@/components/dashboard/DashboardSessionContext'
 import { CardSection, StatCard } from '@/components/ui/Card'
 import Button from '@/components/ui/Button'
 import { formatUZS, pluralRu } from '@/lib/utils'
+import { exportTopItemsCsv, exportWaitersCsv } from '@/lib/export'
 import type { ExtendedAnalyticsResponse } from '@/lib/types'
 import type { AnalyticsResponse } from '@/app/api/analytics/route'
 
@@ -87,6 +89,11 @@ export default function DashboardOwnerAnalyticsPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
+      {/* Onboarding wizard — only shows for new shops */}
+      {session.selectedShopId && (
+        <OnboardingWizard shopId={session.selectedShopId} shopName={session.shopName ?? 'Ваше заведение'} />
+      )}
+
       <section className="flex flex-col gap-2">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -194,7 +201,20 @@ export default function DashboardOwnerAnalyticsPage() {
           </div>
 
           <div className="grid gap-6 xl:grid-cols-2">
-            <CardSection title="Топ блюд за период">
+            <CardSection
+              title="Топ блюд за период"
+              action={
+                !loading && topItems.length > 0 ? (
+                  <button
+                    onClick={() => exportTopItemsCsv(topItems, `top_items_${from}_${to}.csv`)}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-brand-600 hover:text-brand-700 transition-colors"
+                  >
+                    <ExportIcon />
+                    CSV
+                  </button>
+                ) : null
+              }
+            >
               <DataTable
                 columns={TOP_ITEMS_COLUMNS}
                 data={topItems}
@@ -205,7 +225,20 @@ export default function DashboardOwnerAnalyticsPage() {
               />
             </CardSection>
 
-            <CardSection title="Официанты за период">
+            <CardSection
+              title="Официанты за период"
+              action={
+                !loading && waiterRows.length > 0 ? (
+                  <button
+                    onClick={() => exportWaitersCsv(waiterRows, `waiters_${from}_${to}.csv`)}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-brand-600 hover:text-brand-700 transition-colors"
+                  >
+                    <ExportIcon />
+                    CSV
+                  </button>
+                ) : null
+              }
+            >
               <DataTable
                 columns={WAITER_COLUMNS}
                 data={waiterRows}
@@ -325,4 +358,14 @@ function ReceiptIcon() {
 
 function PulseIcon() {
   return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><path d="M22 12h-4l-3 7-4-14-3 7H2" /></svg>
+}
+
+function ExportIcon() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  )
 }

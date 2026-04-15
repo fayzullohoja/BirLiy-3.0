@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import AppHeader, { HeaderIconButton } from '@/components/layout/AppHeader'
 import PageContainer, { EmptyState, Section } from '@/components/ui/PageContainer'
 import Card from '@/components/ui/Card'
@@ -11,17 +11,93 @@ import { formatTime, pluralRu } from '@/lib/utils'
 import { useKitchenSession } from './_context/KitchenSessionContext'
 import type { ApiResponse, Order, OrderItem } from '@/lib/types'
 
-const REFRESH_INTERVAL_MS = 15_000
+const REFRESH_INTERVAL_MS = 10_000
 const LIVE_FETCH_OPTIONS: RequestInit = { cache: 'no-store' }
+const SOUND_PREF_KEY = 'kitchen:sound'
+
+// ─── Web Audio bell ───────────────────────────────────────────────────────────
+
+let audioCtx: AudioContext | null = null
+
+function getAudioCtx(): AudioContext | null {
+  if (typeof window === 'undefined') return null
+  if (!audioCtx) {
+    try { audioCtx = new AudioContext() } catch { return null }
+  }
+  return audioCtx
+}
+
+async function playBell() {
+  const ctx = getAudioCtx()
+  if (!ctx) return
+  if (ctx.state === 'suspended') {
+    try { await ctx.resume() } catch { return }
+  }
+
+  const now = ctx.currentTime
+
+  // First ding
+  const osc1 = ctx.createOscillator()
+  const gain1 = ctx.createGain()
+  osc1.connect(gain1)
+  gain1.connect(ctx.destination)
+  osc1.type = 'sine'
+  osc1.frequency.setValueAtTime(880, now)
+  osc1.frequency.exponentialRampToValueAtTime(440, now + 0.4)
+  gain1.gain.setValueAtTime(0, now)
+  gain1.gain.linearRampToValueAtTime(0.6, now + 0.01)
+  gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.5)
+  osc1.start(now)
+  osc1.stop(now + 0.5)
+
+  // Second ding (slightly delayed)
+  const osc2 = ctx.createOscillator()
+  const gain2 = ctx.createGain()
+  osc2.connect(gain2)
+  gain2.connect(ctx.destination)
+  osc2.type = 'sine'
+  osc2.frequency.setValueAtTime(1100, now + 0.25)
+  osc2.frequency.exponentialRampToValueAtTime(550, now + 0.7)
+  gain2.gain.setValueAtTime(0, now + 0.25)
+  gain2.gain.linearRampToValueAtTime(0.5, now + 0.27)
+  gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.8)
+  osc2.start(now + 0.25)
+  osc2.stop(now + 0.8)
+}
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function KitchenPage() {
   const session = useKitchenSession()
 
-  const [orders, setOrders] = useState<Order[]>([])
-  const [loading, setLoading] = useState(true)
+  const [orders, setOrders]       = useState<Order[]>([])
+  const [loading, setLoading]     = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError]         = useState<string | null>(null)
   const [updatingId, setUpdatingId] = useState<string | null>(null)
+
+  // Sound state
+  const [soundEnabled, setSoundEnabled] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true
+    const stored = localStorage.getItem(SOUND_PREF_KEY)
+    return stored === null ? true : stored === 'true'
+  })
+  const [audioUnlocked, setAudioUnlocked] = useState(false)
+  const knownOrderIds = useRef<Set<string>>(new Set())
+  const isFirstFetch = useRef(true)
+
+  function toggleSound() {
+    setSoundEnabled(prev => {
+      const next = !prev
+      localStorage.setItem(SOUND_PREF_KEY, String(next))
+      // Unlock AudioContext on user gesture
+      getAudioCtx()
+      setAudioUnlocked(true)
+      if (next) toast.success('Звук включён 🔔')
+      else toast.success('Звук выключен 🔕')
+      return next
+    })
+  }
 
   const fetchOrders = useCallback(async (mode: 'initial' | 'refresh' = 'initial') => {
     if (session.loading || !session.primaryShopId) return
@@ -46,6 +122,20 @@ export default function KitchenPage() {
           items: (order.items ?? []).filter((item) => item.status === 'in_kitchen'),
         }))
         .filter((order) => (order.items?.length ?? 0) > 0)
+
+      // ── Sound on new orders ──────────────────────────────────────────────
+      if (!isFirstFetch.current) {
+        const newIds = queue.map(o => o.id).filter(id => !knownOrderIds.current.has(id))
+        if (newIds.length > 0 && soundEnabled) {
+          void playBell()
+          // Vibrate if supported
+          if (navigator.vibrate) navigator.vibrate([200, 100, 200])
+        }
+      }
+
+      // Update known IDs
+      knownOrderIds.current = new Set(queue.map(o => o.id))
+      isFirstFetch.current = false
       setOrders(queue)
     } catch {
       if (mode === 'initial') setError('Не удалось загрузить очередь кухни')
@@ -53,7 +143,7 @@ export default function KitchenPage() {
       if (mode === 'initial') setLoading(false)
       if (mode === 'refresh') setRefreshing(false)
     }
-  }, [session.loading, session.primaryShopId])
+  }, [session.loading, session.primaryShopId, soundEnabled])
 
   useEffect(() => {
     if (session.loading || !session.primaryShopId) return
@@ -122,18 +212,42 @@ export default function KitchenPage() {
       <AppHeader
         title="BirLiy Kassa"
         subtitle={session.shopName ? `Кухня · ${session.shopName}` : 'Кухня'}
+        showSignOut={false}
         rightSlot={(
-          <HeaderIconButton
-            label="Обновить очередь"
-            onClick={() => fetchOrders('refresh')}
-            className={refreshing ? 'animate-spin' : undefined}
-          >
-            <RefreshIcon />
-          </HeaderIconButton>
+          <div className="flex items-center gap-1">
+            <HeaderIconButton
+              label={soundEnabled ? 'Выключить звук' : 'Включить звук'}
+              onClick={toggleSound}
+            >
+              {soundEnabled ? <SoundOnIcon /> : <SoundOffIcon />}
+            </HeaderIconButton>
+            <HeaderIconButton
+              label="Обновить очередь"
+              onClick={() => { void fetchOrders('refresh') }}
+              className={refreshing ? 'animate-spin' : undefined}
+            >
+              <RefreshIcon />
+            </HeaderIconButton>
+          </div>
         )}
       />
 
-      <PageContainer>
+      {/* Audio unlock banner — shown until user taps anything */}
+      {!audioUnlocked && soundEnabled && !loading && (
+        <button
+          onClick={() => {
+            getAudioCtx()
+            void playBell()
+            setAudioUnlocked(true)
+          }}
+          className="fixed top-14 inset-x-0 z-30 flex items-center gap-2 bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white"
+        >
+          <SoundOnIcon />
+          <span>Нажмите чтобы активировать звук для уведомлений</span>
+        </button>
+      )}
+
+      <PageContainer className={!audioUnlocked && soundEnabled && !loading ? 'pt-10' : undefined}>
         <div className="flex gap-3 px-4 pt-4 pb-2">
           <SummaryChip label="В очереди" value={orders.length} tone="warning" />
           <SummaryChip label="Позиций" value={summary.itemCount} tone="neutral" />
@@ -143,7 +257,7 @@ export default function KitchenPage() {
         {summary.overdue > 0 && !loading && (
           <div className="mx-4 mt-1 mb-1 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3">
             <p className="text-sm font-semibold text-amber-800">
-              {pluralRu(summary.overdue, 'заказ ждёт дольше 20 минут', 'заказа ждут дольше 20 минут', 'заказов ждут дольше 20 минут')}
+              ⚠️ {pluralRu(summary.overdue, 'заказ ждёт дольше 20 минут', 'заказа ждут дольше 20 минут', 'заказов ждут дольше 20 минут')}
             </p>
           </div>
         )}
@@ -156,7 +270,7 @@ export default function KitchenPage() {
               title="Не удалось открыть кухню"
               description={error}
               action={(
-                <Button variant="secondary" size="sm" onClick={() => fetchOrders('initial')}>
+                <Button variant="secondary" size="sm" onClick={() => { void fetchOrders('initial') }}>
                   Повторить
                 </Button>
               )}
@@ -184,6 +298,8 @@ export default function KitchenPage() {
     </>
   )
 }
+
+// ─── Kitchen Order Card ───────────────────────────────────────────────────────
 
 function KitchenOrderCard({
   order,
@@ -249,7 +365,7 @@ function KitchenOrderCard({
         </div>
 
         <Button fullWidth loading={loading} onClick={onReady}>
-          Готово
+          ✓ Готово
         </Button>
       </div>
     </Card>
@@ -276,29 +392,21 @@ function KitchenItemRow({ item }: { item: OrderItem }) {
   )
 }
 
+// ─── Summary chip ─────────────────────────────────────────────────────────────
+
 function SummaryChip({
-  label,
-  value,
-  suffix,
-  tone,
+  label, value, suffix, tone,
 }: {
-  label: string
-  value: number
-  suffix?: string
-  tone: 'warning' | 'danger' | 'neutral'
+  label: string; value: number; suffix?: string; tone: 'warning' | 'danger' | 'neutral'
 }) {
   const colors = {
     warning: 'bg-amber-50 text-amber-700 border-amber-200',
-    danger: 'bg-red-50 text-red-700 border-red-200',
+    danger:  'bg-red-50 text-red-700 border-red-200',
     neutral: 'bg-surface-muted text-ink-secondary border-surface-border',
   }
-
   return (
     <div className={`flex-1 flex flex-col items-center py-2 rounded-2xl border text-center ${colors[tone]}`}>
-      <span className="text-xl font-bold leading-tight">
-        {value}
-        {suffix ?? ''}
-      </span>
+      <span className="text-xl font-bold leading-tight">{value}{suffix ?? ''}</span>
       <span className="text-xs font-medium">{label}</span>
     </div>
   )
@@ -306,11 +414,9 @@ function SummaryChip({
 
 function TimePill({ elapsed, urgent }: { elapsed: number; urgent: boolean }) {
   return (
-    <span
-      className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
-        urgent ? 'bg-red-100 text-red-700' : 'bg-surface-muted text-ink-secondary'
-      }`}
-    >
+    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold ${
+      urgent ? 'bg-red-100 text-red-700' : 'bg-surface-muted text-ink-secondary'
+    }`}>
       {elapsed} мин
     </span>
   )
@@ -320,10 +426,7 @@ function KitchenSkeleton() {
   return (
     <div className="space-y-3">
       {Array.from({ length: 3 }).map((_, i) => (
-        <div
-          key={i}
-          className="h-64 rounded-2xl bg-surface animate-pulse border border-surface-border"
-        />
+        <div key={i} className="h-64 rounded-2xl bg-surface animate-pulse border border-surface-border" />
       ))}
     </div>
   )
@@ -337,8 +440,29 @@ function getKitchenBatchStartedAt(order: Order) {
   const timestamps = (order.items ?? [])
     .map((item) => item.sent_to_kitchen_at ?? item.created_at)
     .filter(Boolean)
-
   return timestamps.sort()[0] ?? order.updated_at ?? order.created_at
+}
+
+// ─── Icons ────────────────────────────────────────────────────────────────────
+
+function SoundOnIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+      <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+      <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+    </svg>
+  )
+}
+
+function SoundOffIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+      <line x1="23" y1="9" x2="17" y2="15" />
+      <line x1="17" y1="9" x2="23" y2="15" />
+    </svg>
+  )
 }
 
 function RefreshIcon() {

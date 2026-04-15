@@ -7,7 +7,6 @@ import PageContainer, { Section } from '@/components/ui/PageContainer'
 import { StatCard } from '@/components/ui/Card'
 import { toast } from '@/components/ui/Toast'
 import { formatUZS, formatDate } from '@/lib/utils'
-import { getTelegramWebApp } from '@/lib/telegram/webapp'
 import { useOwnerSession } from './_context/OwnerSessionContext'
 import type { AnalyticsResponse } from '../api/analytics/route'
 
@@ -52,13 +51,7 @@ export default function OwnerDashboardPage() {
       }
       const url = json.data?.url
       if (url) {
-        const twa = getTelegramWebApp()
-        if (twa) {
-          window.location.assign(url)
-        } else {
-          // Fallback for local dev — open in new tab
-          window.open(url, '_blank')
-        }
+        window.location.assign(url)
       }
     } catch {
       toast.error('Не удалось открыть веб-панель')

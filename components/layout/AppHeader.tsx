@@ -7,7 +7,6 @@ import { BottomSheet } from '@/components/ui/BottomSheet'
 import Button from '@/components/ui/Button'
 import { toast } from '@/components/ui/Toast'
 import { signOutCurrentSession } from '@/lib/auth/clientAuth'
-import { getTelegramWebApp } from '@/lib/telegram/webapp'
 
 interface AppHeaderProps {
   title: string
@@ -121,14 +120,7 @@ function HeaderDashboardButton({ href }: { href: string }) {
       }
 
       const url = json.data?.url ?? new URL(href, window.location.origin).toString()
-      const telegram = getTelegramWebApp()
-
-      if (telegram) {
-        window.location.assign(url)
-        return
-      }
-
-      window.open(url, '_blank', 'noopener,noreferrer')
+      window.location.assign(url)
     } catch {
       toast.error('Не удалось открыть веб-панель')
     } finally {
