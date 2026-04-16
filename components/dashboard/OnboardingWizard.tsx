@@ -16,6 +16,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import BrandLogo from '@/components/brand/BrandLogo'
 import { toast } from '@/components/ui/Toast'
 
 const LS_KEY = 'birliy:onboarding:dismissed'
@@ -249,9 +250,7 @@ function WizardModal({ step, shopId, shopName, setup, onStepChange, onSetupChang
 function StepWelcome({ shopName, onNext }: { shopName: string; onNext: () => void }) {
   return (
     <div className="flex flex-col items-center text-center gap-5">
-      <div className="w-16 h-16 rounded-3xl bg-brand-600 flex items-center justify-center">
-        <span className="text-3xl font-bold text-white">B</span>
-      </div>
+      <BrandLogo size={64} className="rounded-3xl" priority />
       <div>
         <h2 className="text-2xl font-bold text-ink">Добро пожаловать!</h2>
         <p className="mt-2 text-sm text-ink-secondary max-w-sm">

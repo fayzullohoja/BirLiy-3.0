@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter } from 'next/navigation'
+import BrandLogo from '@/components/brand/BrandLogo'
 import { formatUZS, formatDate, formatTime, PAYMENT_TYPE_LABELS } from '@/lib/utils'
 import type { PublicReceiptOrder } from '@/lib/types'
 
@@ -89,9 +90,7 @@ export default function ReceiptPage() {
 
           {/* Header */}
           <div className="text-center px-6 pt-8 pb-5 border-b border-dashed border-gray-300">
-            <div className="w-14 h-14 rounded-2xl bg-gray-900 flex items-center justify-center mx-auto mb-3">
-              <span className="text-2xl font-bold text-white">B</span>
-            </div>
+            <BrandLogo size={56} className="mx-auto mb-3 rounded-2xl" priority />
             <h1 className="text-xl font-bold text-gray-900">BirLiy Kassa</h1>
             <p className="text-sm text-gray-500 mt-0.5">Кассовый чек</p>
           </div>

@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import type { Metadata } from 'next'
+import BrandLogo from '@/components/brand/BrandLogo'
 
 export const metadata: Metadata = {
   title: 'Страница не найдена — BirLiy Kassa',
@@ -32,7 +33,10 @@ export default function NotFound() {
           На главную
         </Link>
 
-        <p className="mt-6 text-xs text-ink-muted">BirLiy Kassa</p>
+        <div className="mt-6 flex items-center justify-center gap-2 text-xs text-ink-muted">
+          <BrandLogo size={16} className="rounded-md" />
+          <span>BirLiy Kassa</span>
+        </div>
       </div>
     </div>
   )

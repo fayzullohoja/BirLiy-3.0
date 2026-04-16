@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import BrandLogo from '@/components/brand/BrandLogo'
 import Sidebar from '@/components/dashboard/Sidebar'
 import TopBar from '@/components/dashboard/TopBar'
 import { useDashboardSession } from '@/components/dashboard/DashboardSessionContext'
@@ -69,6 +70,7 @@ export default function DashboardLayout({
               Политика конфиденциальности
             </a>
             <span>·</span>
+            <BrandLogo size={16} className="rounded-md" />
             <span>&copy; {new Date().getFullYear()} BirLiy</span>
           </div>
         </footer>

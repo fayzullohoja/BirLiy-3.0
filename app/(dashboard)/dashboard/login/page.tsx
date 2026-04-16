@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import BrandLogo from '@/components/brand/BrandLogo'
 import { toast } from '@/components/ui/Toast'
 
 type WidgetAuthUser = Record<string, unknown>
@@ -80,9 +81,7 @@ export default function DashboardLoginPage() {
     <div className="min-h-screen bg-surface-muted px-4 py-10">
       <div className="mx-auto flex min-h-[calc(100vh-5rem)] w-full max-w-md items-center justify-center">
         <div className="w-full rounded-[28px] border border-surface-border bg-white p-8 text-center shadow-card-lg">
-          <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-3xl bg-brand-600 text-2xl font-bold text-white">
-            B
-          </div>
+          <BrandLogo size={64} className="mx-auto mb-6 rounded-3xl" priority />
           <h1 className="text-2xl font-bold text-ink">BirLiy Kassa</h1>
           <p className="mt-2 text-sm text-ink-secondary">
             Вход в web dashboard через Telegram Login Widget

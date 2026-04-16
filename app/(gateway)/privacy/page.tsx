@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import BrandLogo from '@/components/brand/BrandLogo'
 
 export const metadata: Metadata = {
   title: 'Политика конфиденциальности — BirLiy Kassa',
@@ -15,9 +16,7 @@ export default function PrivacyPage() {
 
       {/* Header */}
       <div className="mb-10 text-center">
-        <div className="inline-flex h-14 w-14 items-center justify-center rounded-3xl bg-gray-900 mb-4">
-          <span className="text-2xl font-bold text-white">B</span>
-        </div>
+        <BrandLogo size={56} className="mx-auto mb-4 rounded-3xl" priority />
         <h1 className="text-3xl font-bold text-gray-900">Политика конфиденциальности</h1>
         <p className="mt-2 text-sm text-gray-500">{APP_NAME} · Последнее обновление: {LAST_UPDATED}</p>
       </div>

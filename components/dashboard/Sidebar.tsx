@@ -1,5 +1,6 @@
 'use client'
 
+import BrandLogo from '@/components/brand/BrandLogo'
 import { cn } from '@/lib/utils'
 import DashboardNavItem, { type DashboardNavItemConfig } from '@/components/dashboard/NavItem'
 
@@ -40,9 +41,7 @@ export default function Sidebar({
         )}
       >
         <div className="flex items-center gap-3 border-b border-slate-800 px-4 py-5">
-          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-600 font-bold">
-            B
-          </div>
+          <BrandLogo size={44} className="rounded-2xl" priority />
           {!collapsed && (
             <div className="min-w-0 flex-1">
               <p className="truncate text-base font-bold">{title}</p>

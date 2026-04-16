@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import BrandLogo from '@/components/brand/BrandLogo'
 import AppHeader from '@/components/layout/AppHeader'
 import { BottomSheet } from '@/components/ui/BottomSheet'
 import Button from '@/components/ui/Button'
@@ -240,6 +241,7 @@ export default function MiniAppProfilePage() {
               Политика конфиденциальности
             </a>
             <span>·</span>
+            <BrandLogo size={16} className="rounded-md" />
             <span>BirLiy Kassa</span>
           </div>
         </Section>
